@@ -2,6 +2,8 @@
 name = "rust_nes"
 version = "0.0.1"
 authors = ["David Tyler <davet.code@gmail.com>"]
+repository = "https://github.com/DaveTCode/nes-emulator-rust.git"
+license = "MIT"
 
 [dependencies]
 bitflags = "1.2.1"

@@ -1,0 +1,27 @@
+refresh_rate: 30 seconds
+
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "{m}{n}"
+  file:
+    kind: file
+    path: "log/all.log"
+  nes_test:
+    kind: file
+    path: "log/cpu.log"
+    encoder:
+      pattern: "{m}{n}"
+
+root:
+  level: debug
+  appenders:
+    - stdout
+    - file
+
+loggers:
+  rust_nes::cpu:
+    level: debug
+    appenders:
+      - nes_test

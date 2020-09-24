@@ -421,7 +421,7 @@ impl<'a> Iterator for Cpu<'a> {
                                     address_low_byte: None,
                                     address_high_byte: None,
                                     pointer: None,
-                                    indirect_address_low_byte: indirect_address_low_byte,
+                                    indirect_address_low_byte,
                                     indirect_address_high_byte: Some(
                                         self.read_and_inc_program_counter(),
                                     ),
@@ -438,8 +438,8 @@ impl<'a> Iterator for Cpu<'a> {
                                     address_low_byte: Some(self.mmu.read_byte(indirect_address)),
                                     address_high_byte: None,
                                     pointer: None,
-                                    indirect_address_low_byte: indirect_address_low_byte,
-                                    indirect_address_high_byte: indirect_address_high_byte,
+                                    indirect_address_low_byte,
+                                    indirect_address_high_byte,
                                     checked_page_boundary: false,
                                 }
                             }

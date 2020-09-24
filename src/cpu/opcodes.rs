@@ -1,7 +1,7 @@
 use cpu::status_flags::StatusFlags;
 use cpu::Cpu;
 use cpu::CpuState;
-use log::{debug, error, info};
+use log::error;
 
 #[derive(Debug)]
 pub(super) struct Opcode {
@@ -62,7 +62,7 @@ impl Opcode {
                 todo!();
             }
             Operation::AND => {
-                cpu.registers.a = cpu.registers.a & operand.unwrap();
+                cpu.registers.a &= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 CpuState::FetchOpcode
             }
@@ -188,7 +188,7 @@ impl Opcode {
                 CpuState::FetchOpcode
             }
             Operation::EOR => {
-                cpu.registers.a = cpu.registers.a ^ operand.unwrap();
+                cpu.registers.a ^= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 CpuState::FetchOpcode
             }
@@ -460,14 +460,11 @@ impl Opcode {
                 }
             }
             Operation::SRE => {
-                if cpu.registers.program_counter == 0xF2F0 {
-                    let a = 1;
-                }
                 let result = operand.unwrap() >> 1;
                 cpu.registers
                     .status_register
                     .set(StatusFlags::CARRY_FLAG, operand.unwrap() & 1 == 1);
-                cpu.registers.a = cpu.registers.a ^ result;
+                cpu.registers.a ^= result;
                 cpu.set_negative_zero_flags(cpu.registers.a);
 
                 CpuState::WritingResult {

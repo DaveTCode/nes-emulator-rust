@@ -84,7 +84,7 @@ impl Opcode {
                     _ => CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
-                        dummy: true
+                        dummy: true,
                     },
                 }
             }
@@ -161,7 +161,7 @@ impl Opcode {
                 CpuState::WritingResult {
                     value: result,
                     address: address.unwrap(),
-                    dummy: true
+                    dummy: true,
                 }
             }
             Operation::DEC => {
@@ -175,7 +175,7 @@ impl Opcode {
                     _ => CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
-                        dummy: true
+                        dummy: true,
                     },
                 }
             }
@@ -203,7 +203,7 @@ impl Opcode {
                     _ => CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
-                        dummy: true
+                        dummy: true,
                     },
                 }
             }
@@ -222,7 +222,7 @@ impl Opcode {
                 CpuState::WritingResult {
                     value: result,
                     address: address.unwrap(),
-                    dummy: true
+                    dummy: true,
                 }
             }
             Operation::JMP => {
@@ -276,7 +276,7 @@ impl Opcode {
                     _ => CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
-                        dummy: true
+                        dummy: true,
                     },
                 }
             }
@@ -324,7 +324,7 @@ impl Opcode {
                     _ => CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
-                        dummy: true
+                        dummy: true,
                     },
                 }
             }
@@ -350,7 +350,7 @@ impl Opcode {
                     _ => CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
-                        dummy: true
+                        dummy: true,
                     },
                 }
             }
@@ -376,7 +376,7 @@ impl Opcode {
                     _ => CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
-                        dummy: true
+                        dummy: true,
                     },
                 }
             }
@@ -402,7 +402,7 @@ impl Opcode {
                     _ => CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
-                        dummy: true
+                        dummy: true,
                     },
                 }
             }
@@ -415,7 +415,7 @@ impl Opcode {
             Operation::SAX => CpuState::WritingResult {
                 value: cpu.registers.a & cpu.registers.x,
                 address: address.unwrap(),
-                dummy: false
+                dummy: false,
             },
             Operation::SBC => {
                 cpu.adc(!operand.unwrap());
@@ -456,7 +456,7 @@ impl Opcode {
                 CpuState::WritingResult {
                     value: result,
                     address: address.unwrap(),
-                    dummy: true
+                    dummy: true,
                 }
             }
             Operation::SRE => {
@@ -470,23 +470,23 @@ impl Opcode {
                 CpuState::WritingResult {
                     address: address.unwrap(),
                     value: result,
-                    dummy: true
+                    dummy: true,
                 }
             }
             Operation::STA => CpuState::WritingResult {
                 value: cpu.registers.a,
                 address: address.unwrap(),
-                dummy: false
+                dummy: false,
             },
             Operation::STX => CpuState::WritingResult {
                 value: cpu.registers.x,
                 address: address.unwrap(),
-                dummy: false
+                dummy: false,
             },
             Operation::STY => CpuState::WritingResult {
                 value: cpu.registers.y,
                 address: address.unwrap(),
-                dummy: false
+                dummy: false,
             },
             Operation::TAS => {
                 todo!();

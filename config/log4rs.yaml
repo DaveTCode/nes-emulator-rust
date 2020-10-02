@@ -17,11 +17,11 @@ appenders:
 root:
   level: debug
   appenders:
-    - stdout
+    #- stdout
     - file
 
 loggers:
   rust_nes::cpu:
-    level: debug
+    level: error
     appenders:
       - nes_test

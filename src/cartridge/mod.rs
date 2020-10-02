@@ -1,7 +1,5 @@
-pub(crate) mod mappers;
+mod mappers;
 
-use cartridge::mappers::mapper_zero::MapperZero;
-use cartridge::mappers::Cartridge;
 use log::info;
 use std::error::Error;
 use std::fmt;
@@ -26,6 +24,14 @@ impl From<io::Error> for CartridgeError {
     }
 }
 
+/// A trait representing the CPU/PPU address bus into the cartridge
+pub(crate) trait CartridgeAddressBus {
+    fn read_byte(&self, address: u16) -> u8;
+    fn write_byte(&mut self, address: u16, value: u8, cycles: u32);
+}
+
+/// Represents flags/details about the rom from the header
+/// c.f. http://wiki.nesdev.com/w/index.php/INES for details
 pub(crate) struct CartridgeHeader {
     pub(crate) prg_rom_16kb_units: u8,
     pub(crate) chr_rom_8kb_units: u8,
@@ -43,7 +49,16 @@ impl fmt::Display for CartridgeHeader {
     }
 }
 
-pub(crate) fn from_file(file_path: &str) -> Result<Box<dyn Cartridge>, CartridgeError> {
+pub(crate) fn from_file(
+    file_path: &str,
+) -> Result<
+    (
+        Box<dyn CartridgeAddressBus>,
+        Box<dyn CartridgeAddressBus>,
+        CartridgeHeader,
+    ),
+    CartridgeError,
+> {
     let bytes = std::fs::read(file_path)?;
 
     if bytes.len() < 0x10 {
@@ -70,12 +85,15 @@ pub(crate) fn from_file(file_path: &str) -> Result<Box<dyn Cartridge>, Cartridge
         });
     }
 
+    let prg_rom = bytes[16..prg_rom_end].to_vec();
+    let chr_rom = match header.chr_rom_8kb_units {
+        0 => vec![0; 0x2000], // There always has to be a bank of CHR ROM to read from, even if there's nothing there
+        _ => bytes[prg_rom_end..chr_rom_end].to_vec(),
+    };
+
     match header.mapper {
-        0 => Ok(Box::new(MapperZero {
-            header,
-            prg_rom: bytes[16..prg_rom_end].to_vec(),
-            chr_rom: bytes[prg_rom_end..chr_rom_end].to_vec(),
-        })),
+        0 => Ok(mappers::nrom::from_header(prg_rom, chr_rom, header)),
+        1 => Ok(mappers::mmc1::from_header(prg_rom, chr_rom, header)),
         _ => Err(CartridgeError {
             message: format!("Mapper {:x} not yet implemented", header.mapper),
         }),

@@ -1,0 +1,81 @@
+use cartridge::CartridgeAddressBus;
+use cartridge::CartridgeHeader;
+use log::debug;
+
+pub(crate) struct MapperZeroPrgChip {
+    prg_rom: Vec<u8>,
+    prg_ram: [u8; 0x2000],
+}
+
+pub(crate) struct MapperZeroChrChip {
+    chr_rom: Vec<u8>,
+    ppu_vram: [u8; 0x1000],
+}
+
+impl CartridgeAddressBus for MapperZeroPrgChip {
+    fn read_byte(&self, address: u16) -> u8 {
+        match address {
+            0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize], // TODO - Family basic model only
+            0x8000..=0xBFFF => self.prg_rom[(address - 0x8000) as usize],
+            0xC000..=0xFFFF => self.prg_rom[(address - 0xC000) as usize], // TODO! - Not true for NROM-256
+            _ => todo!("Not yet mapped addresses in zero mapper {:04X}", address),
+        }
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        match address {
+            0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize] = value, // TODO - Family basic model only
+            _ => (), // TODO - Do writes to anywhere else do anything?
+        }
+    }
+}
+
+impl CartridgeAddressBus for MapperZeroChrChip {
+    fn read_byte(&self, address: u16) -> u8 {
+        match address {
+            0x0000..=0x1FFF => self.chr_rom[address as usize],
+            0x2000..=0x2FFF => self.ppu_vram[(address - 0x2000) as usize],
+            0x3000..=0x3EFF => self.ppu_vram[(address - 0x3000) as usize],
+            _ => todo!("Not yet mapped addresses in zero mapper {:04X}", address),
+        }
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        debug!("Writing to CHR address bus {:04X}={:02X}", address, value);
+
+        match address {
+            0x0000..=0x1FFF => (), // TODO - Assume that writes to chr rom don't do anything
+            0x2000..=0x2FFF => self.ppu_vram[(address - 0x2000) as usize] = value,
+            0x3000..=0x3EFF => self.ppu_vram[(address - 0x3000) as usize] = value,
+            0x3F00..=0x3FFF => panic!(
+                "Shouldn't be writing to palette registers through the cartridge address bus"
+            ),
+            _ => panic!(
+                "Write to {:04X} ({:02X}) invalid for CHR address bus",
+                address, value
+            ),
+        }
+    }
+}
+
+pub(crate) fn from_header(
+    prg_rom: Vec<u8>,
+    chr_rom: Vec<u8>,
+    header: CartridgeHeader,
+) -> (
+    Box<dyn CartridgeAddressBus>,
+    Box<dyn CartridgeAddressBus>,
+    CartridgeHeader,
+) {
+    (
+        Box::new(MapperZeroPrgChip {
+            prg_rom,
+            prg_ram: [0; 0x2000],
+        }),
+        Box::new(MapperZeroChrChip {
+            chr_rom,
+            ppu_vram: [0; 0x1000],
+        }),
+        header,
+    )
+}

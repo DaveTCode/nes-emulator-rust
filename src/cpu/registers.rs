@@ -1,28 +1,28 @@
 use cpu::status_flags::StatusFlags;
 
 #[derive(Debug)]
-pub(crate) struct Registers {
+pub(super) struct Registers {
     // Accumulator
-    pub(crate) a: u8,
+    pub(super) a: u8,
 
     // X, Y - index registers
-    pub(crate) x: u8,
-    pub(crate) y: u8,
+    pub(super) x: u8,
+    pub(super) y: u8,
 
-    pub(crate) stack_pointer: u8,
-    pub(crate) program_counter: u16,
-    pub(crate) status_register: StatusFlags,
+    pub(super) stack_pointer: u8,
+    pub(super) program_counter: u16,
+    pub(super) status_register: StatusFlags,
 }
 
-impl Default for Registers {
-    fn default() -> Self {
+impl Registers {
+    pub(super) fn new(pc: u16) -> Self {
         Registers {
             a: 0x0,
             x: 0x0,
             y: 0x0,
             stack_pointer: 0xFD,
             status_register: StatusFlags::INTERRUPT_DISABLE_FLAG,
-            program_counter: 0xC000,
+            program_counter: pc,
         }
     }
 }

@@ -2,4 +2,6 @@ log/
 target/
 .idea/
 .vscode/
-roms/real
+roms/real/
+~*.xlsx
+*.csv

@@ -1,13 +1,48 @@
+mod interrupts;
 mod opcodes;
 mod registers;
 mod status_flags;
 
+use apu::Apu;
+use cartridge::CartridgeAddressBus;
+use cpu::interrupts::Interrupt;
 use cpu::opcodes::Opcode;
 use cpu::opcodes::{AddressingMode, InstructionType, Operation, OPCODE_TABLE};
 use cpu::registers::Registers;
 use cpu::status_flags::StatusFlags;
-use log::{debug, error, info};
-use mmu::Mmu;
+use io::Button;
+use io::Controller;
+use io::Io;
+use log::{debug, info};
+use ppu::Ppu;
+use ppu::SCREEN_HEIGHT;
+use ppu::SCREEN_WIDTH;
+
+#[derive(Debug, Copy, Clone)]
+enum State {
+    InterruptState(InterruptState),
+    CpuState(CpuState),
+    DmaState(DmaState),
+}
+
+#[derive(Debug, Copy, Clone)]
+enum DmaState {
+    DummyCycle,
+    OddCpuCycle,
+    ReadCycle,
+    WriteCycle(u8),
+}
+
+#[derive(Debug, Copy, Clone)]
+enum InterruptState {
+    InternalOps1(Interrupt),
+    InternalOps2(Interrupt),
+    PushPCH(Interrupt),
+    PushPCL(Interrupt),
+    PushStatusRegister(Interrupt),
+    PullIRQVecLow(Interrupt),
+    PullIRQVecHigh(Interrupt),
+}
 
 ///
 /// Cpu states are used to represent cycles of an instruction
@@ -72,29 +107,84 @@ enum CpuState {
 }
 
 pub struct Cpu<'a> {
-    state: CpuState,
+    state: State,
     registers: Registers,
-    mmu: &'a mut Mmu<'a>,
     cycles: u32,
+    // TODO - apu_cycle_counter: u8,
+    cpu_cycle_counter: u8,
+    ram: [u8; 0x800],
+    apu: &'a mut Apu,
+    io: &'a mut Io,
+    ppu: &'a mut Ppu,
+    prg_address_bus: Box<dyn CartridgeAddressBus>,
+    trigger_dma: bool,
+    dma_address: u16,
 }
 
 impl<'a> Cpu<'a> {
-    pub(crate) fn new(mmu: &'a mut Mmu<'a>) -> Self {
-        let r: Registers = Default::default();
+    pub(crate) fn new(
+        prg_address_bus: Box<dyn CartridgeAddressBus>,
+        apu: &'a mut Apu,
+        io: &'a mut Io,
+        ppu: &'a mut Ppu,
+    ) -> Self {
+        // The processor starts at the RESET interrupt handler address
+        let pc = prg_address_bus.read_byte(Interrupt::RESET.offset()) as u16
+            | ((prg_address_bus.read_byte(Interrupt::RESET.offset().wrapping_add(1)) as u16) << 8);
 
         Cpu {
-            state: CpuState::FetchOpcode,
-            registers: r,
-            mmu,
+            state: State::CpuState(CpuState::FetchOpcode),
+            registers: Registers::new(pc),
             cycles: 0,
+            cpu_cycle_counter: 3,
+            ram: [0; 0x800],
+            apu,
+            io,
+            ppu,
+            prg_address_bus,
+            trigger_dma: false,
+            dma_address: 0x0000,
         }
     }
 
-    fn nes_test_log(&self, opcode: &Opcode) -> String {
-        let pc_1 = self.mmu.read_byte(self.registers.program_counter);
-        let pc_2 = self.mmu.read_byte(self.registers.program_counter + 1);
+    fn read_byte(&mut self, address: u16) -> u8 {
+        match address {
+            0x0000..=0x07FF => self.ram[address as usize],
+            0x0800..=0x1FFF => self.ram[(address % 0x0800) as usize], // Mirrors of ram space
+            0x2000..=0x2007 => self.ppu.read_register(address),
+            0x2008..=0x3FFF => self.ppu.read_register((address % 8) + 0x2000),
+            0x4000..=0x4013 | 0x4015 => self.apu.read_byte(address), // APU registers
+            0x4014 => 0x00, // TODO - Is this correct? We read 0 on the DMA register?
+            0x4016..=0x4017 => self.io.read_byte(address), // Controller registers
+            0x4018..=0x401F => 0x00, // TODO - Unused APU & IO registers
+            0x4020..=0xFFFF => self.prg_address_bus.read_byte(address),
+        }
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8) {
+        debug!("{:04X} = {:02X}", address, value);
+
+        match address {
+            0x0000..=0x07FF => self.ram[address as usize] = value,
+            0x0800..=0x1FFF => self.ram[(address % 0x0800) as usize] = value, // Mirrors of ram space
+            0x2000..=0x2007 => self.ppu.write_register(address, value),
+            0x2008..=0x3FFF => self.ppu.write_register((address % 8) + 0x2000, value),
+            0x4000..=0x4013 | 0x4015 | 0x4017 => self.apu.write_byte(address, value), // APU registers
+            0x4014 => {
+                self.dma_address = (value as u16) << 8;
+                self.trigger_dma = true;
+            } // Trigger DMA
+            0x4016 => self.io.write_byte(address, value),                             // IO Register
+            0x4018..=0x401F => (), // TODO - Unused APU & IO registers
+            0x4020..=0xFFFF => self.prg_address_bus.write_byte(address, value, self.cycles),
+        }
+    }
+
+    fn nes_test_log(&mut self, opcode: &Opcode) -> String {
+        let pc_1 = self.read_byte(self.registers.program_counter);
+        let pc_2 = self.read_byte(self.registers.program_counter + 1);
         format!(
-            "{:04X}  {:} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CPUC:{:}",
+            "{:04X}  {:} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CPUC:{:} SL:{:}",
             self.registers.program_counter - 1,
             opcode.nes_test_log(pc_1, pc_2),
             self.registers.a,
@@ -102,24 +192,23 @@ impl<'a> Cpu<'a> {
             self.registers.y,
             self.registers.status_register.bits() | 0b0010_0000,
             self.registers.stack_pointer,
-            self.cycles
+            self.cycles,
+            self.ppu.current_scanline()
         )
     }
 
     fn push_to_stack(&mut self, value: u8) {
-        self.mmu
-            .write_byte(self.registers.stack_pointer as u16 | 0x0100, value);
+        self.write_byte(self.registers.stack_pointer as u16 | 0x0100, value);
         self.registers.stack_pointer = self.registers.stack_pointer.wrapping_sub(1);
     }
 
     fn pop_from_stack(&mut self) -> u8 {
         self.registers.stack_pointer = self.registers.stack_pointer.wrapping_add(1);
-        self.mmu
-            .read_byte(self.registers.stack_pointer as u16 | 0x0100)
+        self.read_byte(self.registers.stack_pointer as u16 | 0x0100)
     }
 
     fn read_and_inc_program_counter(&mut self) -> u8 {
-        let value = self.mmu.read_byte(self.registers.program_counter);
+        let value = self.read_byte(self.registers.program_counter);
         self.registers.program_counter += 1;
 
         value
@@ -224,11 +313,8 @@ impl<'a> Cpu<'a> {
             // Cycle 4 - Read $HHLL from memory as operand
             (Some(low_byte), Some(high_byte)) => {
                 let address = low_byte as u16 | ((high_byte as u16) << 8);
-                opcode.execute(
-                    self,
-                    Some(self.mmu.read_byte(address)),
-                    Some(address),
-                )
+                let value = Some(self.read_byte(address));
+                opcode.execute(self, value, Some(address))
             }
         }
     }
@@ -253,41 +339,34 @@ impl<'a> Cpu<'a> {
                 checked_page_boundary: false,
             },
             // Cycle 3 - Read high byte
-            (Some(_), None) => {
-                CpuState::ReadingOperand {
-                    opcode,
-                    address_low_byte,
-                    address_high_byte: Some(self.read_and_inc_program_counter()),
-                    pointer: None,
-                    indirect_address_low_byte: None,
-                    indirect_address_high_byte: None,
-                    checked_page_boundary: false,
-                }
-            }
+            (Some(_), None) => CpuState::ReadingOperand {
+                opcode,
+                address_low_byte,
+                address_high_byte: Some(self.read_and_inc_program_counter()),
+                pointer: None,
+                indirect_address_low_byte: None,
+                indirect_address_high_byte: None,
+                checked_page_boundary: false,
+            },
             // Cycle 4 - Read $HHLL from memory as operand
             (Some(low_byte), Some(high_byte)) => {
                 let unindexed_address = low_byte as u16 | ((high_byte as u16) << 8);
                 let correct_address = unindexed_address.wrapping_add(index as u16);
 
                 if checked_page_boundary {
-                    opcode.execute(
-                        self,
-                        Some(self.mmu.read_byte(correct_address)),
-                        Some(correct_address),
-                    )
+                    let value = Some(self.read_byte(correct_address));
+                    opcode.execute(self, value, Some(correct_address))
                 } else {
                     // Dummy read, whether or not we end up using it (may read from a memory mapped port)
-                    let first_read_address = low_byte.wrapping_add(index) as u16 | ((high_byte as u16) << 8);
-                    let _ = self.mmu.read_byte(first_read_address);
+                    let first_read_address =
+                        low_byte.wrapping_add(index) as u16 | ((high_byte as u16) << 8);
+                    let _ = self.read_byte(first_read_address);
 
                     match opcode.operation.instruction_type() {
                         InstructionType::Read => {
                             if correct_address == first_read_address {
-                                opcode.execute(
-                                    self,
-                                    Some(self.mmu.read_byte(correct_address)),
-                                    Some(correct_address),
-                                )
+                                let value = Some(self.read_byte(correct_address));
+                                opcode.execute(self, value, Some(correct_address))
                             } else {
                                 CpuState::ReadingOperand {
                                     opcode,
@@ -313,11 +392,8 @@ impl<'a> Cpu<'a> {
                             }
                         }
                         _ => {
-                            opcode.execute(
-                                self,
-                                Some(self.mmu.read_byte(correct_address)),
-                                Some(correct_address),
-                            )
+                            let value = Some(self.read_byte(correct_address));
+                            opcode.execute(self, value, Some(correct_address))
                         }
                     }
                 }
@@ -325,13 +401,53 @@ impl<'a> Cpu<'a> {
             (_, _) => panic!(), // Coding bug, can't read high byte first
         }
     }
-}
 
-impl<'a> Iterator for Cpu<'a> {
-    type Item = ();
+    fn step_interrupt_handler(&mut self, state: InterruptState) -> State {
+        match state {
+            InterruptState::InternalOps1(i) => {
+                State::InterruptState(InterruptState::InternalOps2(i))
+            }
+            InterruptState::InternalOps2(i) => State::InterruptState(InterruptState::PushPCH(i)),
+            InterruptState::PushPCH(i) => {
+                self.push_to_stack((self.registers.program_counter >> 8) as u8);
 
-    fn next(&mut self) -> Option<()> {
-        self.state = match self.state {
+                State::InterruptState(InterruptState::PushPCL(i))
+            }
+            InterruptState::PushPCL(i) => {
+                self.push_to_stack(self.registers.program_counter as u8);
+
+                State::InterruptState(InterruptState::PushStatusRegister(i))
+            }
+            InterruptState::PushStatusRegister(i) => {
+                self.push_to_stack(
+                    (self.registers.status_register.bits() | 0b0010_0000) & 0b1110_1111,
+                );
+
+                // Higher priority interrupts can override lower priority ones
+                // at this point, specifically an NMI can override a BRK/IRQ
+                if self.ppu.trigger_nmi {
+                    self.ppu.trigger_nmi = false;
+                    State::InterruptState(InterruptState::PullIRQVecHigh(Interrupt::NMI))
+                } else {
+                    State::InterruptState(InterruptState::PullIRQVecHigh(i))
+                }
+            }
+            InterruptState::PullIRQVecHigh(i) => {
+                self.registers.program_counter = self.read_byte(i.offset()) as u16;
+
+                State::InterruptState(InterruptState::PullIRQVecLow(i))
+            }
+            InterruptState::PullIRQVecLow(i) => {
+                self.registers.program_counter = (self.registers.program_counter & 0b1111_1111)
+                    | ((self.read_byte(i.offset().wrapping_add(1)) as u16) << 8);
+
+                State::CpuState(CpuState::FetchOpcode)
+            }
+        }
+    }
+
+    fn step_cpu(&mut self, state: CpuState) -> State {
+        State::CpuState(match state {
             CpuState::FetchOpcode => {
                 let opcode = &OPCODE_TABLE[self.read_and_inc_program_counter() as usize];
 
@@ -367,11 +483,9 @@ impl<'a> Iterator for Cpu<'a> {
                 checked_page_boundary,
             } => {
                 match opcode.address_mode {
-                    AddressingMode::Absolute => self.next_absolute_mode_state(
-                        opcode,
-                        address_low_byte,
-                        address_high_byte,
-                    ),
+                    AddressingMode::Absolute => {
+                        self.next_absolute_mode_state(opcode, address_low_byte, address_high_byte)
+                    }
                     AddressingMode::AbsoluteXIndexed => self.next_absolute_indexed_mode_state(
                         opcode,
                         address_low_byte,
@@ -435,7 +549,7 @@ impl<'a> Iterator for Cpu<'a> {
                                 // Cycle 3 - Read the address low byte from the indirect address
                                 CpuState::ReadingOperand {
                                     opcode,
-                                    address_low_byte: Some(self.mmu.read_byte(indirect_address)),
+                                    address_low_byte: Some(self.read_byte(indirect_address)),
                                     address_high_byte: None,
                                     pointer: None,
                                     indirect_address_low_byte,
@@ -448,7 +562,7 @@ impl<'a> Iterator for Cpu<'a> {
                                 // Note - this is deliberately "bugged", JMP (0x01FF) will jump to 0x01FF | 0x0100 << 8 NOT 0x01FF | 0x0200 << 8 as you might imagine (this is a known 6502 cpu bug)
                                 let indirect_address = (indirect_low_byte.wrapping_add(1) as u16)
                                     | ((indirect_high_byte as u16) << 8);
-                                let high_byte = self.mmu.read_byte(indirect_address);
+                                let high_byte = self.read_byte(indirect_address);
 
                                 opcode.execute(
                                     self,
@@ -498,7 +612,7 @@ impl<'a> Iterator for Cpu<'a> {
 
                                 CpuState::ReadingOperand {
                                     opcode,
-                                    address_low_byte: Some(self.mmu.read_byte(address)),
+                                    address_low_byte: Some(self.read_byte(address)),
                                     address_high_byte,
                                     pointer,
                                     indirect_address_low_byte,
@@ -512,33 +626,34 @@ impl<'a> Iterator for Cpu<'a> {
                                     .wrapping_add(self.registers.x)
                                     .wrapping_add(1)
                                     as u16;
-                                let address_high_byte = self.mmu.read_byte(indirect_address_high_byte);
+                                let address_high_byte = self.read_byte(indirect_address_high_byte);
 
                                 match opcode.operation.instruction_type() {
                                     InstructionType::Write => {
-                                        let address = (address_low_byte as u16) | ((address_high_byte as u16) << 8);
-                                        opcode.execute(self, Some(self.mmu.read_byte(address)), Some(address))
-                                    },
+                                        let address = (address_low_byte as u16)
+                                            | ((address_high_byte as u16) << 8);
+                                        let value = Some(self.read_byte(address));
+                                        opcode.execute(self, value, Some(address))
+                                    }
                                     _ => CpuState::ReadingOperand {
                                         opcode,
                                         address_low_byte: Some(address_low_byte),
                                         address_high_byte: Some(address_high_byte),
                                         pointer,
                                         indirect_address_low_byte,
-                                        indirect_address_high_byte: Some(indirect_address_high_byte as u8),
+                                        indirect_address_high_byte: Some(
+                                            indirect_address_high_byte as u8,
+                                        ),
                                         checked_page_boundary: false,
-                                    }
+                                    },
                                 }
                             }
                             (Some(_), Some(_), Some(low_byte), Some(high_byte)) => {
                                 let address = (low_byte as u16) | ((high_byte as u16) << 8);
+                                let value = Some(self.read_byte(address));
 
                                 // Cycle 5 - Read the operand and execute operation
-                                opcode.execute(
-                                    self,
-                                    Some(self.mmu.read_byte(address)),
-                                    Some(address),
-                                )
+                                opcode.execute(self, value, Some(address))
                             }
                         }
                     }
@@ -567,7 +682,7 @@ impl<'a> Iterator for Cpu<'a> {
                                 CpuState::ReadingOperand {
                                     opcode,
                                     address_low_byte: Some(
-                                        self.mmu.read_byte(indirect_low_byte as u16),
+                                        self.read_byte(indirect_low_byte as u16),
                                     ),
                                     address_high_byte,
                                     pointer: None,
@@ -581,7 +696,9 @@ impl<'a> Iterator for Cpu<'a> {
                                 CpuState::ReadingOperand {
                                     opcode,
                                     address_low_byte: Some(address_low_byte),
-                                    address_high_byte: Some(self.mmu.read_byte(indirect_low_byte.wrapping_add(1) as u16)),
+                                    address_high_byte: Some(
+                                        self.read_byte(indirect_low_byte.wrapping_add(1) as u16),
+                                    ),
                                     pointer: Some(indirect_low_byte),
                                     indirect_address_low_byte,
                                     indirect_address_high_byte,
@@ -590,11 +707,16 @@ impl<'a> Iterator for Cpu<'a> {
                             }
                             (Some(_), Some(low_byte), Some(high_byte)) => {
                                 // Cycle 5(/6) - Read the operand and execute the operation checking for crossing page boundary
-                                let unindexed_address = (low_byte as u16) | ((high_byte as u16) << 8);
-                                let address = unindexed_address.wrapping_add(self.registers.y as u16);
+                                let unindexed_address =
+                                    (low_byte as u16) | ((high_byte as u16) << 8);
+                                let address =
+                                    unindexed_address.wrapping_add(self.registers.y as u16);
 
-                                if checked_page_boundary || (unindexed_address >> 4) == (address >> 4) {
-                                    opcode.execute(self, Some(self.mmu.read_byte(address)), Some(address))
+                                if checked_page_boundary
+                                    || (unindexed_address >> 4) == (address >> 4)
+                                {
+                                    let value = Some(self.read_byte(address));
+                                    opcode.execute(self, value, Some(address))
                                 } else {
                                     CpuState::ReadingOperand {
                                         opcode,
@@ -675,12 +797,9 @@ impl<'a> Iterator for Cpu<'a> {
                             match opcode.operation.instruction_type() {
                                 InstructionType::Write => {
                                     let address = operand as u16;
+                                    let value = Some(self.read_byte(address));
 
-                                    opcode.execute(
-                                        self,
-                                        Some(self.mmu.read_byte(address)),
-                                        Some(address),
-                                    )
+                                    opcode.execute(self, value, Some(address))
                                 }
                                 _ => CpuState::ReadingOperand {
                                     opcode,
@@ -695,11 +814,13 @@ impl<'a> Iterator for Cpu<'a> {
                         }
                         Some(low_byte) => {
                             let address = low_byte as u16;
+                            let value = Some(self.read_byte(address));
 
-                            opcode.execute(self, Some(self.mmu.read_byte(address)), Some(address))
+                            opcode.execute(self, value, Some(address))
                         }
-                    }
-                    AddressingMode::ZeroPageXIndexed => match (address_low_byte, address_high_byte) {
+                    },
+                    AddressingMode::ZeroPageXIndexed => match (address_low_byte, address_high_byte)
+                    {
                         (None, _) => {
                             // Cycle 2 - Read the zero page low byte
                             CpuState::ReadingOperand {
@@ -714,35 +835,36 @@ impl<'a> Iterator for Cpu<'a> {
                         }
                         (Some(low_byte), None) => {
                             // Cycle 3 - Dummy read of the unindexed address
-                            let _ = self.mmu.read_byte(low_byte as u16);
+                            let _ = self.read_byte(low_byte as u16);
 
                             match opcode.operation.instruction_type() {
                                 InstructionType::Write => {
                                     let address = low_byte.wrapping_add(self.registers.x) as u16;
+                                    let value = Some(self.read_byte(address));
 
-                                    opcode.execute(self, Some(self.mmu.read_byte(address)), Some(address))
+                                    opcode.execute(self, value, Some(address))
                                 }
-                                _ => {
-                                    CpuState::ReadingOperand {
-                                        opcode,
-                                        address_low_byte,
-                                        address_high_byte: Some(0x0),
-                                        pointer: None,
-                                        indirect_address_low_byte: None,
-                                        indirect_address_high_byte: None,
-                                        checked_page_boundary: false,
-                                    }
-                                }
+                                _ => CpuState::ReadingOperand {
+                                    opcode,
+                                    address_low_byte,
+                                    address_high_byte: Some(0x0),
+                                    pointer: None,
+                                    indirect_address_low_byte: None,
+                                    indirect_address_high_byte: None,
+                                    checked_page_boundary: false,
+                                },
                             }
                         }
                         (Some(low_byte), Some(_)) => {
                             // Cycle 4 - Read operand from the indexed zero page address
                             let address = low_byte.wrapping_add(self.registers.x) as u16;
+                            let value = Some(self.read_byte(address));
 
-                            opcode.execute(self, Some(self.mmu.read_byte(address)), Some(address))
+                            opcode.execute(self, value, Some(address))
                         }
-                    }
-                    AddressingMode::ZeroPageYIndexed => match (address_low_byte, address_high_byte) {
+                    },
+                    AddressingMode::ZeroPageYIndexed => match (address_low_byte, address_high_byte)
+                    {
                         (None, _) => {
                             // Cycle 2 - Read the zero page low byte
                             CpuState::ReadingOperand {
@@ -757,35 +879,38 @@ impl<'a> Iterator for Cpu<'a> {
                         }
                         (Some(low_byte), None) => {
                             // Cycle 3 - Dummy read of the unindexed address
-                            let _ = self.mmu.read_byte(low_byte as u16);
+                            let _ = self.read_byte(low_byte as u16);
 
                             match opcode.operation.instruction_type() {
                                 InstructionType::Write => {
                                     let address = low_byte.wrapping_add(self.registers.y) as u16;
+                                    let value = Some(self.read_byte(address));
 
-                                    opcode.execute(self, Some(self.mmu.read_byte(address)), Some(address))
+                                    opcode.execute(self, value, Some(address))
                                 }
-                                _ => {
-                                    CpuState::ReadingOperand {
-                                        opcode,
-                                        address_low_byte,
-                                        address_high_byte: Some(0x0),
-                                        pointer: None,
-                                        indirect_address_low_byte: None,
-                                        indirect_address_high_byte: None,
-                                        checked_page_boundary: false,
-                                    }
-                                }
+                                _ => CpuState::ReadingOperand {
+                                    opcode,
+                                    address_low_byte,
+                                    address_high_byte: Some(0x0),
+                                    pointer: None,
+                                    indirect_address_low_byte: None,
+                                    indirect_address_high_byte: None,
+                                    checked_page_boundary: false,
+                                },
                             }
                         }
                         (Some(low_byte), Some(_)) => {
                             // Cycle 4 - Read operand from the indexed zero page address
                             let address = low_byte.wrapping_add(self.registers.y) as u16;
+                            let value = Some(self.read_byte(address));
 
-                            opcode.execute(self, Some(self.mmu.read_byte(address)), Some(address))
+                            opcode.execute(self, value, Some(address))
                         }
-                    }
-                    _ => panic!("Invalid, can't read operand for addressing mode {:?}", opcode.address_mode)
+                    },
+                    _ => panic!(
+                        "Invalid, can't read operand for addressing mode {:?}",
+                        opcode.address_mode
+                    ),
                 }
             }
             CpuState::ThrowawayRead { opcode, operand } => opcode.execute(self, operand, None),
@@ -869,18 +994,115 @@ impl<'a> Iterator for Cpu<'a> {
                 operand,
                 address,
             } => opcode.execute(self, operand, address),
-            CpuState::WritingResult { value, address, dummy: true} => {
-                CpuState::WritingResult { value, address, dummy: false }
+            CpuState::WritingResult {
+                value,
+                address,
+                dummy: true,
+            } => CpuState::WritingResult {
+                value,
+                address,
+                dummy: false,
             },
-            CpuState::WritingResult { value, address, dummy: false} => {
-                self.mmu.write_byte(address, value);
+            CpuState::WritingResult {
+                value,
+                address,
+                dummy: false,
+            } => {
+                self.write_byte(address, value);
 
                 CpuState::FetchOpcode
             }
+        })
+    }
+
+    /// When the CPU is paused for DMA this steps the CPU by a single clock
+    fn step_dma_handler(&mut self, state: DmaState) -> State {
+        match state {
+            // TODO - Handle extra +1 cycle on odd CPU cycle
+            DmaState::DummyCycle => State::DmaState(DmaState::ReadCycle),
+            DmaState::OddCpuCycle => State::DmaState(DmaState::ReadCycle),
+            DmaState::ReadCycle => {
+                let value = self.read_byte(self.dma_address);
+
+                State::DmaState(DmaState::WriteCycle(value))
+            }
+            DmaState::WriteCycle(value) => {
+                self.ppu.write_dma_byte(value);
+
+                if self.dma_address & 0xFF == 0xFF {
+                    State::CpuState(CpuState::FetchOpcode)
+                } else {
+                    State::DmaState(DmaState::ReadCycle)
+                }
+            }
+        }
+    }
+
+    /// Move the cpu on by a single clock cycle
+    fn clock(&mut self) {
+        self.state = match self.state {
+            State::CpuState(state) => self.step_cpu(state),
+            State::InterruptState(state) => self.step_interrupt_handler(state),
+            State::DmaState(state) => self.step_dma_handler(state),
         };
 
-        self.cycles += 1;
+        if let State::CpuState(CpuState::FetchOpcode) = self.state {
+            // Check for interrupts after completion of previous operation
+            // BEFORE reading next opcode
+            if self.ppu.trigger_nmi {
+                self.ppu.trigger_nmi = false;
+                self.state = State::InterruptState(InterruptState::InternalOps1(Interrupt::NMI));
 
+                info!("Starting NMI interrupt");
+            } else if self.trigger_dma {
+                // Also check whether we're starting DMA on the next cycle
+                self.trigger_dma = false;
+                self.state = State::DmaState(DmaState::DummyCycle);
+
+                info!("Starting DMA transfer");
+            }
+        }
+
+        self.cycles += 1;
+    }
+
+    pub(super) fn button_down(&mut self, controller: Controller, button: Button) {
+        self.io.button_down(controller, button);
+    }
+
+    pub(super) fn button_up(&mut self, controller: Controller, button: Button) {
+        self.io.button_up(controller, button);
+    }
+
+    pub(super) fn is_frame_complete_cycle(&self) -> bool {
+        self.ppu.output_cycle()
+    }
+
+    pub(super) fn get_framebuffer(&self) -> &[u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize] {
+        &self.ppu.frame_buffer
+    }
+
+    pub(super) fn dump_ppu_state(
+        &self,
+        vram_clone: &mut [u8; 0x4000],
+    ) -> (&[u8; 0x100], &[u8; 0x20]) {
+        self.ppu.dump_state(vram_clone)
+    }
+}
+
+impl<'a> Iterator for Cpu<'a> {
+    type Item = ();
+
+    fn next(&mut self) -> Option<()> {
+        // Always clock the PPU
+        self.ppu.next();
+
+        // Check if we need to clock the CPU
+        self.cpu_cycle_counter -= 1;
+        if self.cpu_cycle_counter == 0 {
+            self.cpu_cycle_counter = 3;
+            self.clock();
+        }
         // Does the cpu ever halt? If no return None, otherwise this is just an
         // infinite sequence. Maybe bad opcode? Undefined behaviour of some sort?
         None

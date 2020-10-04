@@ -73,7 +73,7 @@ pub(crate) fn from_file(
         mapper: (bytes[6] >> 4) | (bytes[7] & 0b1111_0000),
     };
 
-    info!("{}", header);
+    info!("{}: {:02X} {:02X}", header, bytes[6], bytes[7]);
 
     let prg_rom_start = 0x10 as usize;
     let prg_rom_end = prg_rom_start + (header.prg_rom_16kb_units as usize * 0x4000);
@@ -87,8 +87,8 @@ pub(crate) fn from_file(
 
     let prg_rom = bytes[16..prg_rom_end].to_vec();
     let chr_rom = match header.chr_rom_8kb_units {
-        0 => vec![0; 0x2000], // There always has to be a bank of CHR ROM to read from, even if there's nothing there
-        _ => bytes[prg_rom_end..chr_rom_end].to_vec(),
+        0 => None, // There always has to be a bank of CHR ROM to read from, even if there's nothing there
+        _ => Some(bytes[prg_rom_end..chr_rom_end].to_vec()),
     };
 
     match header.mapper {

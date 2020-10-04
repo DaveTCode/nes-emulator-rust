@@ -1,6 +1,7 @@
+use cartridge::mappers::ChrData;
 use cartridge::CartridgeAddressBus;
 use cartridge::CartridgeHeader;
-use log::debug;
+use log::{debug, info};
 
 pub(crate) struct MapperZeroPrgChip {
     prg_rom: Vec<u8>,
@@ -8,8 +9,23 @@ pub(crate) struct MapperZeroPrgChip {
 }
 
 pub(crate) struct MapperZeroChrChip {
-    chr_rom: Vec<u8>,
+    chr_data: ChrData,
     ppu_vram: [u8; 0x1000],
+}
+
+impl MapperZeroChrChip {
+    fn new(chr_rom: Option<Vec<u8>>) -> Self {
+        match chr_rom {
+            Some(rom) => MapperZeroChrChip {
+                chr_data: ChrData::Rom(rom),
+                ppu_vram: [0; 0x1000],
+            },
+            None => MapperZeroChrChip {
+                chr_data: ChrData::Ram([0; 0x2000]),
+                ppu_vram: [0; 0x1000],
+            }
+        }
+    }
 }
 
 impl CartridgeAddressBus for MapperZeroPrgChip {
@@ -33,7 +49,10 @@ impl CartridgeAddressBus for MapperZeroPrgChip {
 impl CartridgeAddressBus for MapperZeroChrChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x0000..=0x1FFF => self.chr_rom[address as usize],
+            0x0000..=0x1FFF => match &self.chr_data {
+                ChrData::Rom(rom) => rom[address as usize],
+                ChrData::Ram(ram) => ram[address as usize],
+            },
             0x2000..=0x2FFF => self.ppu_vram[(address - 0x2000) as usize],
             0x3000..=0x3EFF => self.ppu_vram[(address - 0x3000) as usize],
             _ => todo!("Not yet mapped addresses in zero mapper {:04X}", address),
@@ -44,7 +63,10 @@ impl CartridgeAddressBus for MapperZeroChrChip {
         debug!("Writing to CHR address bus {:04X}={:02X}", address, value);
 
         match address {
-            0x0000..=0x1FFF => (), // TODO - Assume that writes to chr rom don't do anything
+            0x0000..=0x1FFF => match &mut self.chr_data {
+                ChrData::Rom(_) => (),
+                ChrData::Ram(ram) => ram[address as usize] = value,
+            },
             0x2000..=0x2FFF => self.ppu_vram[(address - 0x2000) as usize] = value,
             0x3000..=0x3EFF => self.ppu_vram[(address - 0x3000) as usize] = value,
             0x3F00..=0x3FFF => panic!(
@@ -60,22 +82,20 @@ impl CartridgeAddressBus for MapperZeroChrChip {
 
 pub(crate) fn from_header(
     prg_rom: Vec<u8>,
-    chr_rom: Vec<u8>,
+    chr_rom: Option<Vec<u8>>,
     header: CartridgeHeader,
 ) -> (
     Box<dyn CartridgeAddressBus>,
     Box<dyn CartridgeAddressBus>,
     CartridgeHeader,
 ) {
+    info!("Creating NROM mapper for cartridge");
     (
         Box::new(MapperZeroPrgChip {
             prg_rom,
             prg_ram: [0; 0x2000],
         }),
-        Box::new(MapperZeroChrChip {
-            chr_rom,
-            ppu_vram: [0; 0x1000],
-        }),
+        Box::new(MapperZeroChrChip::new(chr_rom)),
         header,
     )
 }

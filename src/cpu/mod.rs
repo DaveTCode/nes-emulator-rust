@@ -1023,6 +1023,7 @@ impl<'a> Cpu<'a> {
             DmaState::OddCpuCycle => State::DmaState(DmaState::ReadCycle),
             DmaState::ReadCycle => {
                 let value = self.read_byte(self.dma_address);
+                self.dma_address += 1;
 
                 State::DmaState(DmaState::WriteCycle(value))
             }

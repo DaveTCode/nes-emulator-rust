@@ -98,8 +98,8 @@ pub(crate) fn run(
                             let mut oam_ram_file = File::create("oam_ram.csv").unwrap();
                             let mut palette_ram_file = File::create("palette_ram.csv").unwrap();
 
-                            for i in 0..=0x3FFF {
-                                write!(vram_file, "{:02X}\n", vram[i]);
+                            for b in vram.iter() {
+                                write!(vram_file, "{:02X}\n", b);
                             }
                         }
                         _ => (),

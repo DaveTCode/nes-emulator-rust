@@ -15,13 +15,18 @@ appenders:
       pattern: "{m}{n}"
 
 root:
-  level: debug
-  appenders:
-    #- stdout
-    - file
+  level: error
 
 loggers:
   rust_nes::cpu:
     level: error
     appenders:
       - nes_test
+  rust_nes::ppu:
+    level: debug
+    appenders:
+      - file
+  rust_nes::cartridge:
+    level: debug
+    appenders:
+      - file

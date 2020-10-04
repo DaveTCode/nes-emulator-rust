@@ -37,11 +37,11 @@ fn main() {
             Ok(cartridge) => cartridge,
         };
 
-    info!("Catridge Loaded");
+    info!("Catridge Loaded {:}", cartridge_header);
 
     match opts.renderer.as_str() {
         "sdl2" => sdl2_app::run(256, 240, prg_address_bus, chr_address_bus, cartridge_header),
         "dummy" => todo!("Dummy renderer not yet implemented"),
-        _ => panic!("{:} renderer not implemented"),
+        _ => panic!("{:} renderer not implemented", opts.renderer.as_str()),
     }
 }

@@ -329,7 +329,7 @@ impl Opcode {
                 }
             }
             Operation::ROL => {
-                let mut result = cpu.registers.a << 1;
+                let mut result = operand.unwrap() << 1;
                 if cpu
                     .registers
                     .status_register
@@ -339,7 +339,7 @@ impl Opcode {
                 }
                 cpu.registers
                     .status_register
-                    .set(StatusFlags::CARRY_FLAG, cpu.registers.a & 0b1000_0000 != 0);
+                    .set(StatusFlags::CARRY_FLAG, operand.unwrap() & 0b1000_0000 != 0);
                 cpu.set_negative_zero_flags(result);
 
                 match self.address_mode {
@@ -355,7 +355,7 @@ impl Opcode {
                 }
             }
             Operation::ROR => {
-                let mut result = cpu.registers.a >> 1;
+                let mut result = operand.unwrap() >> 1;
                 if cpu
                     .registers
                     .status_register
@@ -365,7 +365,7 @@ impl Opcode {
                 }
                 cpu.registers
                     .status_register
-                    .set(StatusFlags::CARRY_FLAG, cpu.registers.a & 1 == 1);
+                    .set(StatusFlags::CARRY_FLAG, operand.unwrap() & 1 == 1);
                 cpu.set_negative_zero_flags(result);
 
                 match self.address_mode {

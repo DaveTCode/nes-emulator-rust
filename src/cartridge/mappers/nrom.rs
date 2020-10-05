@@ -23,7 +23,7 @@ impl MapperZeroChrChip {
             None => MapperZeroChrChip {
                 chr_data: ChrData::Ram([0; 0x2000]),
                 ppu_vram: [0; 0x1000],
-            }
+            },
         }
     }
 }

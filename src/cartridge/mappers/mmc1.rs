@@ -128,7 +128,10 @@ impl MMC1PrgChip {
             }
         };
 
-        info!("Bank offsets updated: {:04X} {:04X}", self.prg_bank_offsets[0], self.prg_bank_offsets[1]);
+        info!(
+            "Bank offsets updated: {:04X} {:04X}",
+            self.prg_bank_offsets[0], self.prg_bank_offsets[1]
+        );
     }
 }
 
@@ -213,7 +216,7 @@ impl MMC1ChrChip {
             None => MMC1ChrChip {
                 chr_data: ChrData::Ram([0; 0x2000]),
                 ppu_vram: [0; 0x1000],
-            }
+            },
         }
     }
 }

@@ -28,8 +28,8 @@ impl ScanlineState {
         self.scanline_cycle += 1;
         if self.scanline_cycle == 341 {
             self.scanline_cycle = 0;
-            self.scanline = self.scanline + 1;
-            if self.scanline == 261 {
+            self.scanline += 1;
+            if self.scanline == 262 {
                 self.scanline = 0;
             }
         }
@@ -129,7 +129,7 @@ impl Ppu {
     pub(super) fn new(chr_address_bus: Box<dyn CartridgeAddressBus>) -> Self {
         Ppu {
             scanline_state: ScanlineState {
-                scanline: 0, // TODO - Is this correct? Needed for nestest.log
+                scanline: 0,
                 nametable_byte: 0,
                 attribute_table_byte: 0,
                 bg_high_byte: 0,
@@ -152,7 +152,7 @@ impl Ppu {
                 write_toggle: false,
             },
             oam_addr: 0x0,
-            last_written_byte: 0x0, // TODO - Not sure if this is true? Initial value of the latch is likely 0x0 but might be 0xFF
+            last_written_byte: 0x0,
             is_short_frame: false,
             trigger_nmi: false,
             frame_buffer: [0; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
@@ -171,6 +171,10 @@ impl Ppu {
 
     pub(crate) fn current_scanline(&self) -> u16 {
         self.scanline_state.scanline
+    }
+
+    pub(crate) fn current_scanline_cycle(&self) -> u16 {
+        self.scanline_state.scanline_cycle
     }
 
     /// Return whether or not we're in the cycle immediately after rendering
@@ -314,6 +318,7 @@ impl Ppu {
     /// Writes to the PPU address space
     fn write_byte(&mut self, address: u16, value: u8) {
         debug_assert!(address <= 0x3FFF);
+        debug!("PPU address space write: {:04X}={:02X}", address, value);
 
         match address {
             0x0000..=0x3EFF => self.chr_address_bus.write_byte(address, value, 0),
@@ -396,6 +401,7 @@ impl Ppu {
         let y = scanline as u32;
 
         // Get background pixel
+        // TODO - Handle masking left hand side
         let bg_pixel = match self.ppu_mask.show_background {
             true => self
                 .scanline_state
@@ -404,6 +410,7 @@ impl Ppu {
         };
 
         // Get sprite pixel
+        // TODO - Handle masking left hand side for sprites
         let _sprite_pixel = match self.ppu_mask.show_sprites {
             true => 0x0, // TODO - Get the right sprite pixel
             false => 0x0,

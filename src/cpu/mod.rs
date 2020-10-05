@@ -184,7 +184,7 @@ impl<'a> Cpu<'a> {
         let pc_1 = self.read_byte(self.registers.program_counter);
         let pc_2 = self.read_byte(self.registers.program_counter + 1);
         format!(
-            "{:04X}  {:} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:>3} SL:{:}",
+            "{:04X}  {:} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} PPU:{:>3},{:>3} CYC:{:}",
             self.registers.program_counter - 1,
             opcode.nes_test_log(pc_1, pc_2),
             self.registers.a,
@@ -193,10 +193,8 @@ impl<'a> Cpu<'a> {
             self.registers.status_register.bits() | 0b0010_0000,
             self.registers.stack_pointer,
             self.ppu.current_scanline_cycle(),
-            match self.ppu.current_scanline() {
-                261 => -1,
-                x => x as i32
-            }
+            self.ppu.current_scanline(),
+            self.cycles + 7 // TODO - Why do cycle counts start at 7? Startup process?
         )
     }
 
@@ -715,20 +713,28 @@ impl<'a> Cpu<'a> {
                                 let address =
                                     unindexed_address.wrapping_add(self.registers.y as u16);
 
-                                if checked_page_boundary
-                                    || (unindexed_address >> 4) == (address >> 4)
-                                {
-                                    let value = Some(self.read_byte(address));
-                                    opcode.execute(self, value, Some(address))
-                                } else {
-                                    CpuState::ReadingOperand {
-                                        opcode,
-                                        address_low_byte: Some(low_byte),
-                                        address_high_byte: Some(high_byte),
-                                        pointer: None,
-                                        indirect_address_low_byte,
-                                        indirect_address_high_byte,
-                                        checked_page_boundary: true,
+                                match opcode.operation.instruction_type() {
+                                    InstructionType::Write => {
+                                        let value = Some(self.read_byte(address));
+                                        opcode.execute(self, value, Some(address))
+                                    }
+                                    _ => {
+                                        if checked_page_boundary
+                                            || (unindexed_address >> 4) == (address >> 4)
+                                        {
+                                            let value = Some(self.read_byte(address));
+                                            opcode.execute(self, value, Some(address))
+                                        } else {
+                                            CpuState::ReadingOperand {
+                                                opcode,
+                                                address_low_byte: Some(low_byte),
+                                                address_high_byte: Some(high_byte),
+                                                pointer: None,
+                                                indirect_address_low_byte,
+                                                indirect_address_high_byte,
+                                                checked_page_boundary: true,
+                                            }
+                                        }
                                     }
                                 }
                             }

@@ -136,7 +136,7 @@ impl<'a> Cpu<'a> {
             state: State::CpuState(CpuState::FetchOpcode),
             registers: Registers::new(pc),
             cycles: 0,
-            cpu_cycle_counter: 3,
+            cpu_cycle_counter: 1,
             ram: [0; 0x800],
             apu,
             io,
@@ -162,7 +162,7 @@ impl<'a> Cpu<'a> {
     }
 
     fn write_byte(&mut self, address: u16, value: u8) {
-        debug!("{:04X} = {:02X}", address, value);
+        debug!("CPU address space write {:04X} = {:02X}", address, value);
 
         match address {
             0x0000..=0x07FF => self.ram[address as usize] = value,
@@ -184,7 +184,7 @@ impl<'a> Cpu<'a> {
         let pc_1 = self.read_byte(self.registers.program_counter);
         let pc_2 = self.read_byte(self.registers.program_counter + 1);
         format!(
-            "{:04X}  {:} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CPUC:{:} SL:{:}",
+            "{:04X}  {:} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:>3} SL:{:}",
             self.registers.program_counter - 1,
             opcode.nes_test_log(pc_1, pc_2),
             self.registers.a,
@@ -192,8 +192,11 @@ impl<'a> Cpu<'a> {
             self.registers.y,
             self.registers.status_register.bits() | 0b0010_0000,
             self.registers.stack_pointer,
-            self.cycles,
-            self.ppu.current_scanline()
+            self.ppu.current_scanline_cycle(),
+            match self.ppu.current_scanline() {
+                261 => -1,
+                x => x as i32
+            }
         )
     }
 
@@ -451,7 +454,7 @@ impl<'a> Cpu<'a> {
             CpuState::FetchOpcode => {
                 let opcode = &OPCODE_TABLE[self.read_and_inc_program_counter() as usize];
 
-                debug!("{}", self.nes_test_log(opcode));
+                info!("{}", self.nes_test_log(opcode));
 
                 match opcode.address_mode {
                     AddressingMode::Accumulator => CpuState::ThrowawayRead {
@@ -1095,15 +1098,16 @@ impl<'a> Iterator for Cpu<'a> {
     type Item = ();
 
     fn next(&mut self) -> Option<()> {
-        // Always clock the PPU
-        self.ppu.next();
-
         // Check if we need to clock the CPU
         self.cpu_cycle_counter -= 1;
         if self.cpu_cycle_counter == 0 {
             self.cpu_cycle_counter = 3;
             self.clock();
         }
+
+        // Always clock the PPU
+        self.ppu.next();
+
         // Does the cpu ever halt? If no return None, otherwise this is just an
         // infinite sequence. Maybe bad opcode? Undefined behaviour of some sort?
         None

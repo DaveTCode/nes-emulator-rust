@@ -34,6 +34,19 @@ impl Button {
         }
     }
 
+    fn read_bit(&self, state: u8) -> u8 {
+        match self {
+            Button::A => self.bitflag() & state,
+            Button::B => (self.bitflag() & state) >> 1,
+            Button::Select => (self.bitflag() & state) >> 2,
+            Button::Start => (self.bitflag() & state) >> 3,
+            Button::Up => (self.bitflag() & state) >> 4,
+            Button::Down => (self.bitflag() & state) >> 5,
+            Button::Left => (self.bitflag() & state) >> 6,
+            Button::Right => (self.bitflag() & state) >> 7,
+        }
+    }
+
     fn next(&self) -> Option<Self> {
         match self {
             Button::A => Some(Button::B),
@@ -88,7 +101,10 @@ impl Io {
     }
 
     pub(crate) fn read_byte(&mut self, address: u16) -> u8 {
-        debug!("Reading from controller register {:04X}", address);
+        debug!(
+            "Reading from controller register {:04X}, strobing {:}",
+            address, self.strobe_register
+        );
 
         fn read_controller_state(state: &mut ControllerState, strobing: bool) -> u8 {
             0x40 | if strobing {
@@ -96,7 +112,7 @@ impl Io {
             } else {
                 match &state.reading_button {
                     Some(button) => {
-                        let result = state.all_data & button.bitflag();
+                        let result = button.read_bit(state.all_data);
                         state.reading_button = button.next();
                         result
                     }

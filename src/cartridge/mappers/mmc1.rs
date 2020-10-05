@@ -157,7 +157,7 @@ impl CartridgeAddressBus for MMC1PrgChip {
     }
 
     fn write_byte(&mut self, address: u16, value: u8, cycles: u32) {
-        // Skip writes on consectutive cycles
+        // Skip writes on consecutive cycles
         if cycles == self.last_write_cycle + 1 {
             return;
         }

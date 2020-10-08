@@ -213,7 +213,7 @@ impl Ppu {
                     false => {
                         self.internal_registers.temp_vram_addr =
                             (self.internal_registers.temp_vram_addr & 0xFFE0) | (value as u16) >> 3;
-                        self.internal_registers.fine_x_scroll = value | 0x7;
+                        self.internal_registers.fine_x_scroll = value & 0x7;
                     }
                     true => {
                         self.internal_registers.temp_vram_addr =
@@ -347,7 +347,7 @@ impl Ppu {
             // On a short frame we skip the last dot of the pre-render line, so we need to load the nametable byte here instead
             // Note that this is "not short frame" because that's already been reset by this point
             // Otherwise cycle 0 is always a blank cycle with no fetches
-            if !self.is_short_frame {
+            if !self.is_short_frame && self.ppu_mask.is_rendering_enabled() {
                 self.scanline_state.nametable_byte =
                     self.read_byte(0x2000 | (self.internal_registers.vram_addr & 0x0FFF));
             }
@@ -506,7 +506,7 @@ impl Iterator for Ppu {
         };
 
         self.scanline_state.next_cycle();
-        if trigger_cycle_skip {
+        if trigger_cycle_skip && self.ppu_mask.is_rendering_enabled(){
             self.scanline_state.next_cycle()
         }
 

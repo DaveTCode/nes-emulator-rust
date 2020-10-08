@@ -210,7 +210,7 @@ impl<'a> Cpu<'a> {
 
     fn read_and_inc_program_counter(&mut self) -> u8 {
         let value = self.read_byte(self.registers.program_counter);
-        self.registers.program_counter += 1;
+        self.registers.program_counter = self.registers.program_counter.wrapping_add(1);
 
         value
     }

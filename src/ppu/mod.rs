@@ -230,11 +230,13 @@ impl Ppu {
                 // PPUADDR
                 match self.internal_registers.write_toggle {
                     false => {
-                        self.internal_registers.temp_vram_addr = self.internal_registers.temp_vram_addr & 0xFF |
-                            (((value as u16) & 0b0011_1111) << 8);
+                        self.internal_registers.temp_vram_addr =
+                            self.internal_registers.temp_vram_addr & 0xFF
+                                | (((value as u16) & 0b0011_1111) << 8);
                     }
                     true => {
-                        self.internal_registers.temp_vram_addr = (self.internal_registers.temp_vram_addr & 0xFF00) | value as u16;
+                        self.internal_registers.temp_vram_addr =
+                            (self.internal_registers.temp_vram_addr & 0xFF00) | value as u16;
                         self.internal_registers.vram_addr = self.internal_registers.temp_vram_addr;
                     }
                 };

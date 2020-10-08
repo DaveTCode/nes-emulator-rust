@@ -29,6 +29,7 @@ struct ControlRegister {
 
 pub(crate) struct MMC1PrgChip {
     prg_rom: Vec<u8>,
+    prg_banks: u8,
     prg_ram: [u8; 0x2000],
     prg_ram_enabled: bool,
     last_write_cycle: u32,
@@ -41,11 +42,12 @@ pub(crate) struct MMC1PrgChip {
 }
 
 impl MMC1PrgChip {
-    fn new(prg_rom: Vec<u8>) -> Self {
+    fn new(prg_rom: Vec<u8>, prg_banks: u8) -> Self {
         debug_assert!(prg_rom.len() >= 0x4000);
 
         let mut chip = MMC1PrgChip {
             prg_rom,
+            prg_banks,
             prg_ram: [0; 0x2000],
             prg_ram_enabled: true,
             last_write_cycle: 0,
@@ -108,7 +110,7 @@ impl MMC1PrgChip {
         self.prg_bank = match self.control_register.prg_bank_mode {
             PRGBankMode::Switch32KB => (value >> 1) & 0b111,
             _ => value & 0b1111,
-        };
+        } % self.prg_banks;
 
         self.update_bank_offsets();
     }
@@ -266,7 +268,7 @@ pub(crate) fn from_header(
     CartridgeHeader,
 ) {
     (
-        Box::new(MMC1PrgChip::new(prg_rom)),
+        Box::new(MMC1PrgChip::new(prg_rom, header.prg_rom_16kb_units)),
         Box::new(MMC1ChrChip::new(chr_rom)),
         header,
     )

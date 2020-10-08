@@ -1,14 +1,14 @@
 mod mappers;
 
-use std::io::Read;
-use zip::result::ZipError;
 use log::info;
 use std::error::Error;
-use std::fmt;
-use std::io;
-use std::fs::File;
-use std::path::Path;
 use std::ffi::OsStr;
+use std::fmt;
+use std::fs::File;
+use std::io;
+use std::io::Read;
+use std::path::Path;
+use zip::result::ZipError;
 use zip::ZipArchive;
 
 /// Represents any error which occurs during loading a cartridge
@@ -72,9 +72,7 @@ pub(crate) fn from_file(
     ),
     CartridgeError,
 > {
-    let file_extension = Path::new(file_path)
-        .extension()
-        .and_then(OsStr::to_str);
+    let file_extension = Path::new(file_path).extension().and_then(OsStr::to_str);
     let file = File::open(file_path)?;
 
     let mut bytes = Vec::<u8>::new();
@@ -89,26 +87,25 @@ pub(crate) fn from_file(
 
                     match extension {
                         Some("nes") => Some(ix),
-                        _ => None
+                        _ => None,
                     }
                 })
                 .collect::<Vec<_>>();
-            
+
             match nes_files.first() {
                 None => {
                     return Err(CartridgeError {
-                        message: "The zip file must contain only one file with the .nes extension".to_string()
+                        message: "The zip file must contain only one file with the .nes extension"
+                            .to_string(),
                     });
-                },
+                }
                 Some(zip_file_index) => {
                     let mut zfile = zip.by_index(*zip_file_index).unwrap();
                     zfile.read_to_end(&mut bytes)?;
                 }
             }
-        },
-        _ => {
-            bytes = std::fs::read(file_path)?
-        } 
+        }
+        _ => bytes = std::fs::read(file_path)?,
     };
 
     if bytes.len() < 0x10 {

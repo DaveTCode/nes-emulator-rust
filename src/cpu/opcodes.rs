@@ -1,6 +1,9 @@
+use cpu::interrupts::Interrupt;
 use cpu::status_flags::StatusFlags;
 use cpu::Cpu;
 use cpu::CpuState;
+use cpu::InterruptState;
+use cpu::State;
 use log::error;
 
 #[derive(Debug)]
@@ -46,11 +49,11 @@ impl Opcode {
         cpu: &mut Cpu,
         operand: Option<u8>,
         address: Option<u16>,
-    ) -> CpuState {
+    ) -> State {
         match self.operation {
             Operation::ADC => {
                 cpu.adc(operand.unwrap());
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::AHX => {
                 todo!();
@@ -64,7 +67,7 @@ impl Opcode {
             Operation::AND => {
                 cpu.registers.a &= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::ARR => {
                 todo!();
@@ -79,13 +82,13 @@ impl Opcode {
                 match self.address_mode {
                     AddressingMode::Accumulator => {
                         cpu.registers.a = result;
-                        CpuState::FetchOpcode
+                        State::CpuState(CpuState::FetchOpcode)
                     }
-                    _ => CpuState::WritingResult {
+                    _ => State::CpuState(CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
                         dummy: true,
-                    },
+                    }),
                 }
             }
             Operation::AXS => {
@@ -98,9 +101,9 @@ impl Opcode {
             | Operation::BNE
             | Operation::BPL
             | Operation::BVC
-            | Operation::BVS => CpuState::SetProgramCounter {
+            | Operation::BVS => State::CpuState(CpuState::SetProgramCounter {
                 address: address.unwrap(),
-            },
+            }),
             Operation::BIT => {
                 let result = cpu.registers.a & operand.unwrap();
                 cpu.registers
@@ -114,55 +117,53 @@ impl Opcode {
                     StatusFlags::NEGATIVE_FLAG,
                     operand.unwrap() & 0b1000_0000 != 0,
                 );
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
-            Operation::BRK => {
-                todo!();
-            }
+            Operation::BRK => State::InterruptState(InterruptState::PushPCH(Interrupt::IRQ_BRK)),
             Operation::CLC => {
                 cpu.registers
                     .status_register
                     .remove(StatusFlags::CARRY_FLAG);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CLD => {
                 cpu.registers
                     .status_register
                     .remove(StatusFlags::DECIMAL_FLAG);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CLI => {
                 cpu.registers
                     .status_register
                     .remove(StatusFlags::INTERRUPT_DISABLE_FLAG);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CLV => {
                 cpu.registers
                     .status_register
                     .remove(StatusFlags::OVERFLOW_FLAG);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CMP => {
                 cpu.compare(operand.unwrap(), cpu.registers.a);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CPX => {
                 cpu.compare(operand.unwrap(), cpu.registers.x);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CPY => {
                 cpu.compare(operand.unwrap(), cpu.registers.y);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::DCP => {
                 let result = cpu.decrement(operand.unwrap());
                 cpu.compare(result, cpu.registers.a);
-                CpuState::WritingResult {
+                State::CpuState(CpuState::WritingResult {
                     value: result,
                     address: address.unwrap(),
                     dummy: true,
-                }
+                })
             }
             Operation::DEC => {
                 let result = cpu.decrement(operand.unwrap());
@@ -170,27 +171,27 @@ impl Opcode {
                 match self.address_mode {
                     AddressingMode::Accumulator => {
                         cpu.registers.a = result;
-                        CpuState::FetchOpcode
+                        State::CpuState(CpuState::FetchOpcode)
                     }
-                    _ => CpuState::WritingResult {
+                    _ => State::CpuState(CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
                         dummy: true,
-                    },
+                    }),
                 }
             }
             Operation::DEX => {
                 cpu.registers.x = cpu.decrement(cpu.registers.x);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::DEY => {
                 cpu.registers.y = cpu.decrement(cpu.registers.y);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::EOR => {
                 cpu.registers.a ^= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::INC => {
                 let result = cpu.increment(operand.unwrap());
@@ -198,40 +199,40 @@ impl Opcode {
                 match self.address_mode {
                     AddressingMode::Accumulator => {
                         cpu.registers.a = result;
-                        CpuState::FetchOpcode
+                        State::CpuState(CpuState::FetchOpcode)
                     }
-                    _ => CpuState::WritingResult {
+                    _ => State::CpuState(CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
                         dummy: true,
-                    },
+                    }),
                 }
             }
             Operation::INX => {
                 cpu.registers.x = cpu.increment(cpu.registers.x);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::INY => {
                 cpu.registers.y = cpu.increment(cpu.registers.y);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::ISB => {
                 let result = cpu.increment(operand.unwrap());
                 cpu.adc(!result);
 
-                CpuState::WritingResult {
+                State::CpuState(CpuState::WritingResult {
                     value: result,
                     address: address.unwrap(),
                     dummy: true,
-                }
+                })
             }
             Operation::JMP => {
                 cpu.registers.program_counter = address.unwrap();
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
-            Operation::JSR => CpuState::WritePCHToStack {
+            Operation::JSR => State::CpuState(CpuState::WritePCHToStack {
                 address: address.unwrap(),
-            },
+            }),
             Operation::KIL => {
                 // Illegal opcode - KIL
                 error!("KIL opcode");
@@ -244,22 +245,22 @@ impl Opcode {
                 cpu.registers.a = operand.unwrap();
                 cpu.registers.x = operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::LDA => {
                 cpu.registers.a = operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::LDX => {
                 cpu.registers.x = operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.x);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::LDY => {
                 cpu.registers.y = operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.y);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::LSR => {
                 let result = operand.unwrap() >> 1;
@@ -271,36 +272,36 @@ impl Opcode {
                 match self.address_mode {
                     AddressingMode::Accumulator => {
                         cpu.registers.a = result;
-                        CpuState::FetchOpcode
+                        State::CpuState(CpuState::FetchOpcode)
                     }
-                    _ => CpuState::WritingResult {
+                    _ => State::CpuState(CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
                         dummy: true,
-                    },
+                    }),
                 }
             }
-            Operation::NOP => CpuState::FetchOpcode,
+            Operation::NOP => State::CpuState(CpuState::FetchOpcode),
             Operation::ORA => {
                 cpu.registers.a |= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
-            Operation::PHA => CpuState::PushRegisterOnStack {
+            Operation::PHA => State::CpuState(CpuState::PushRegisterOnStack {
                 value: cpu.registers.a,
-            },
+            }),
             Operation::PHP => {
                 // Note that we mask bits 4, 5 here as this is called from an instruction
-                CpuState::PushRegisterOnStack {
+                State::CpuState(CpuState::PushRegisterOnStack {
                     value: cpu.registers.status_register.bits() | 0b0011_0000,
-                }
+                })
             }
-            Operation::PLA => CpuState::PreIncrementStackPointer {
+            Operation::PLA => State::CpuState(CpuState::PreIncrementStackPointer {
                 operation: self.operation,
-            },
-            Operation::PLP => CpuState::PreIncrementStackPointer {
+            }),
+            Operation::PLP => State::CpuState(CpuState::PreIncrementStackPointer {
                 operation: self.operation,
-            },
+            }),
             Operation::RLA => {
                 let mut result = operand.unwrap() << 1;
                 if cpu
@@ -319,13 +320,13 @@ impl Opcode {
                 match self.address_mode {
                     AddressingMode::Accumulator => {
                         cpu.registers.a = result;
-                        CpuState::FetchOpcode
+                        State::CpuState(CpuState::FetchOpcode)
                     }
-                    _ => CpuState::WritingResult {
+                    _ => State::CpuState(CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
                         dummy: true,
-                    },
+                    }),
                 }
             }
             Operation::ROL => {
@@ -345,13 +346,13 @@ impl Opcode {
                 match self.address_mode {
                     AddressingMode::Accumulator => {
                         cpu.registers.a = result;
-                        CpuState::FetchOpcode
+                        State::CpuState(CpuState::FetchOpcode)
                     }
-                    _ => CpuState::WritingResult {
+                    _ => State::CpuState(CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
                         dummy: true,
-                    },
+                    }),
                 }
             }
             Operation::ROR => {
@@ -371,13 +372,13 @@ impl Opcode {
                 match self.address_mode {
                     AddressingMode::Accumulator => {
                         cpu.registers.a = result;
-                        CpuState::FetchOpcode
+                        State::CpuState(CpuState::FetchOpcode)
                     }
-                    _ => CpuState::WritingResult {
+                    _ => State::CpuState(CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
                         dummy: true,
-                    },
+                    }),
                 }
             }
             Operation::RRA => {
@@ -397,47 +398,47 @@ impl Opcode {
                 match self.address_mode {
                     AddressingMode::Accumulator => {
                         cpu.registers.a = result;
-                        CpuState::FetchOpcode
+                        State::CpuState(CpuState::FetchOpcode)
                     }
-                    _ => CpuState::WritingResult {
+                    _ => State::CpuState(CpuState::WritingResult {
                         address: address.unwrap(),
                         value: result,
                         dummy: true,
-                    },
+                    }),
                 }
             }
-            Operation::RTI => CpuState::PreIncrementStackPointer {
+            Operation::RTI => State::CpuState(CpuState::PreIncrementStackPointer {
                 operation: self.operation,
-            },
-            Operation::RTS => CpuState::PreIncrementStackPointer {
+            }),
+            Operation::RTS => State::CpuState(CpuState::PreIncrementStackPointer {
                 operation: self.operation,
-            },
-            Operation::SAX => CpuState::WritingResult {
+            }),
+            Operation::SAX => State::CpuState(CpuState::WritingResult {
                 value: cpu.registers.a & cpu.registers.x,
                 address: address.unwrap(),
                 dummy: false,
-            },
+            }),
             Operation::SBC => {
                 cpu.adc(!operand.unwrap());
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::SEC => {
                 cpu.registers
                     .status_register
                     .insert(StatusFlags::CARRY_FLAG);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::SED => {
                 cpu.registers
                     .status_register
                     .insert(StatusFlags::DECIMAL_FLAG);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::SEI => {
                 cpu.registers
                     .status_register
                     .insert(StatusFlags::INTERRUPT_DISABLE_FLAG);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::SHX => {
                 todo!();
@@ -453,11 +454,11 @@ impl Opcode {
                 cpu.registers.a |= result;
                 cpu.set_negative_zero_flags(cpu.registers.a);
 
-                CpuState::WritingResult {
+                State::CpuState(CpuState::WritingResult {
                     value: result,
                     address: address.unwrap(),
                     dummy: true,
-                }
+                })
             }
             Operation::SRE => {
                 let result = operand.unwrap() >> 1;
@@ -467,58 +468,58 @@ impl Opcode {
                 cpu.registers.a ^= result;
                 cpu.set_negative_zero_flags(cpu.registers.a);
 
-                CpuState::WritingResult {
+                State::CpuState(CpuState::WritingResult {
                     address: address.unwrap(),
                     value: result,
                     dummy: true,
-                }
+                })
             }
-            Operation::STA => CpuState::WritingResult {
+            Operation::STA => State::CpuState(CpuState::WritingResult {
                 value: cpu.registers.a,
                 address: address.unwrap(),
                 dummy: false,
-            },
-            Operation::STX => CpuState::WritingResult {
+            }),
+            Operation::STX => State::CpuState(CpuState::WritingResult {
                 value: cpu.registers.x,
                 address: address.unwrap(),
                 dummy: false,
-            },
-            Operation::STY => CpuState::WritingResult {
+            }),
+            Operation::STY => State::CpuState(CpuState::WritingResult {
                 value: cpu.registers.y,
                 address: address.unwrap(),
                 dummy: false,
-            },
+            }),
             Operation::TAS => {
                 todo!();
             }
             Operation::TAX => {
                 cpu.registers.x = cpu.registers.a;
                 cpu.set_negative_zero_flags(cpu.registers.x);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::TAY => {
                 cpu.registers.y = cpu.registers.a;
                 cpu.set_negative_zero_flags(cpu.registers.y);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::TSX => {
                 cpu.registers.x = cpu.registers.stack_pointer;
                 cpu.set_negative_zero_flags(cpu.registers.x);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::TXA => {
                 cpu.registers.a = cpu.registers.x;
                 cpu.set_negative_zero_flags(cpu.registers.a);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::TXS => {
                 cpu.registers.stack_pointer = cpu.registers.x;
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::TYA => {
                 cpu.registers.a = cpu.registers.y;
                 cpu.set_negative_zero_flags(cpu.registers.a);
-                CpuState::FetchOpcode
+                State::CpuState(CpuState::FetchOpcode)
             }
             Operation::XAA => {
                 todo!();

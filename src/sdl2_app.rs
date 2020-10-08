@@ -23,7 +23,7 @@ pub(crate) fn run(
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
     let window = video_subsystem
-        .window("NES Emulator", screen_width * 2, screen_height * 2)
+        .window(&format!("NES - {:}", cartridge_header), screen_width * 2, screen_height * 2)
         .build()
         .unwrap();
 

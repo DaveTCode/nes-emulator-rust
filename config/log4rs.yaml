@@ -23,10 +23,10 @@ loggers:
     appenders:
       - nes_test
   rust_nes::ppu:
-    level: debug
+    level: error
     appenders:
       - file
   rust_nes::cartridge:
-    level: debug
+    level: error
     appenders:
       - file

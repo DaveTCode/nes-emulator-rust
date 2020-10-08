@@ -35,13 +35,15 @@ pub(crate) struct MMC1PrgChip {
     load_register: u8,
     shift_writes: u8,
     prg_bank: u8,
-    prg_bank_offsets: [u16; 2],
+    prg_bank_offsets: [u32; 2],
     chr_bank: [u8; 2],
     control_register: ControlRegister,
 }
 
 impl MMC1PrgChip {
     fn new(prg_rom: Vec<u8>) -> Self {
+        debug_assert!(prg_rom.len() >= 0x4000);
+
         let mut chip = MMC1PrgChip {
             prg_rom,
             prg_ram: [0; 0x2000],
@@ -114,17 +116,17 @@ impl MMC1PrgChip {
     fn update_bank_offsets(&mut self) {
         match self.control_register.prg_bank_mode {
             PRGBankMode::FixFirst16KB => {
-                let base = ((self.prg_bank as u16 & 0xF) >> 1) * 0x4000;
+                let base = ((self.prg_bank as u32 & 0xF) >> 1) * 0x4000;
                 self.prg_bank_offsets[0] = base;
                 self.prg_bank_offsets[1] = base + 0x4000;
             }
             PRGBankMode::FixLast16KB => {
-                self.prg_bank_offsets[0] = (self.prg_bank as u16 & 0xF) * 0x4000;
-                self.prg_bank_offsets[1] = self.prg_rom.len() as u16 - 0x4000;
+                self.prg_bank_offsets[0] = (self.prg_bank as u32 & 0xF) * 0x4000;
+                self.prg_bank_offsets[1] = self.prg_rom.len() as u32 - 0x4000;
             }
             PRGBankMode::Switch32KB => {
                 self.prg_bank_offsets[0] = 0;
-                self.prg_bank_offsets[1] = (self.prg_bank as u16 & 0xF) * 0x4000;
+                self.prg_bank_offsets[1] = (self.prg_bank as u32 & 0xF) * 0x4000;
             }
         };
 

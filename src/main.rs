@@ -4,6 +4,7 @@ extern crate clap;
 extern crate log;
 extern crate log4rs;
 extern crate sdl2;
+extern crate zip;
 
 mod apu;
 mod cartridge;

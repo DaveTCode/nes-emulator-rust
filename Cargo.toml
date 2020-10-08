@@ -12,3 +12,4 @@ clap = "3.0.0-beta.2"
 sdl2 = { version = "0.34.3", features = ["bundled", "static-link"] }
 log = "0.4.11"
 log4rs = "1.0.0-alpha-2"
+zip = "0.5.8"

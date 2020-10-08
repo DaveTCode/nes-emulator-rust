@@ -1,9 +1,15 @@
 mod mappers;
 
+use std::io::Read;
+use zip::result::ZipError;
 use log::info;
 use std::error::Error;
 use std::fmt;
 use std::io;
+use std::fs::File;
+use std::path::Path;
+use std::ffi::OsStr;
+use zip::ZipArchive;
 
 /// Represents any error which occurs during loading a cartridge
 #[derive(Debug)]
@@ -18,6 +24,13 @@ impl fmt::Display for CartridgeError {
 }
 impl From<io::Error> for CartridgeError {
     fn from(error: io::Error) -> Self {
+        CartridgeError {
+            message: error.to_string(),
+        }
+    }
+}
+impl From<ZipError> for CartridgeError {
+    fn from(error: ZipError) -> Self {
         CartridgeError {
             message: error.to_string(),
         }
@@ -59,7 +72,44 @@ pub(crate) fn from_file(
     ),
     CartridgeError,
 > {
-    let bytes = std::fs::read(file_path)?;
+    let file_extension = Path::new(file_path)
+        .extension()
+        .and_then(OsStr::to_str);
+    let file = File::open(file_path)?;
+
+    let mut bytes = Vec::<u8>::new();
+    match file_extension {
+        Some("zip") => {
+            let mut zip = ZipArchive::new(file)?;
+
+            let nes_files = (0..zip.len())
+                .filter_map(|ix| {
+                    let zfile = zip.by_index(ix).unwrap();
+                    let extension = Path::new(zfile.name()).extension().and_then(OsStr::to_str);
+
+                    match extension {
+                        Some("nes") => Some(ix),
+                        _ => None
+                    }
+                })
+                .collect::<Vec<_>>();
+            
+            match nes_files.first() {
+                None => {
+                    return Err(CartridgeError {
+                        message: "The zip file must contain only one file with the .nes extension".to_string()
+                    });
+                },
+                Some(zip_file_index) => {
+                    let mut zfile = zip.by_index(*zip_file_index).unwrap();
+                    zfile.read_to_end(&mut bytes)?;
+                }
+            }
+        },
+        _ => {
+            bytes = std::fs::read(file_path)?
+        } 
+    };
 
     if bytes.len() < 0x10 {
         return Err(CartridgeError {

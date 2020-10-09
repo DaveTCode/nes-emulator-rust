@@ -553,4 +553,21 @@ mod ppu_tests {
         assert_eq!(ppu.internal_registers.vram_addr, 0b0111101_11110000);
         assert_eq!(ppu.internal_registers.fine_x_scroll, 0b101);
     }
+
+    #[test]
+    fn test_setting_vram_addr_v2() {
+        let mut ppu = Ppu::new(Box::new(FakeCartridge {}));
+        ppu.write_register(0x2006, 0x04);
+        assert_eq!(ppu.internal_registers.temp_vram_addr, 0b0000100_00000000);
+        ppu.write_register(0x2005, 0x3E);
+        assert_eq!(ppu.internal_registers.temp_vram_addr, 0b1100100_11100000);
+        ppu.write_register(0x2005, 0x7D);
+        assert_eq!(ppu.internal_registers.temp_vram_addr, 0b1100100_11101111);
+        assert_eq!(ppu.internal_registers.vram_addr, 0);
+        assert_eq!(ppu.internal_registers.fine_x_scroll, 0b101);
+        ppu.write_register(0x2006, 0xEF);
+        assert_eq!(ppu.internal_registers.temp_vram_addr, 0b1100100_11101111);
+        assert_eq!(ppu.internal_registers.vram_addr, 0b1100100_11101111);
+        assert_eq!(ppu.internal_registers.fine_x_scroll, 0b101);
+    }
 }

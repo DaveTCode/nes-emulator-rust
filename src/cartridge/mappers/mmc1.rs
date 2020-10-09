@@ -122,16 +122,15 @@ impl MMC1PrgChip {
     fn update_bank_offsets(&mut self) {
         match self.control_register.prg_bank_mode {
             PRGBankMode::FixFirst16KB => {
-                let base = ((self.prg_bank as u32 & 0xF) >> 1) * 0x4000;
-                self.prg_bank_offsets[0] = base;
-                self.prg_bank_offsets[1] = base + 0x4000;
+                self.prg_bank_offsets[0] = 0;
+                self.prg_bank_offsets[1] = (self.prg_bank as u32 & 0xF) * 0x4000;
             }
             PRGBankMode::FixLast16KB => {
                 self.prg_bank_offsets[0] = (self.prg_bank as u32 & 0xF) * 0x4000;
                 self.prg_bank_offsets[1] = self.prg_rom.len() as u32 - 0x4000;
             }
             PRGBankMode::Switch32KB => {
-                self.prg_bank_offsets[0] = (self.prg_bank as u32 & 0xF) * 0x8000;
+                self.prg_bank_offsets[0] = ((self.prg_bank as u32 & 0xF) >> 1) * 0x4000;
                 self.prg_bank_offsets[1] = self.prg_bank_offsets[0] + 0x4000;
             }
         };

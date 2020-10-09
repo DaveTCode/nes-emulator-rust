@@ -96,8 +96,8 @@ pub(crate) fn from_header(
             full.extend(prg_rom.clone());
 
             full
-        },
-        _ => prg_rom
+        }
+        _ => prg_rom,
     };
 
     info!("Creating NROM mapper for cartridge");

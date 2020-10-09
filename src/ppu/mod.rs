@@ -264,7 +264,7 @@ impl Ppu {
     pub(crate) fn read_register(&mut self, address: u16) -> u8 {
         // TODO - Handle behaviour where rendering is off
         debug_assert!(address >= 0x2000 && address <= 0x2007);
-        debug!("PPU register read {:04X}", address);
+        //debug!("PPU register read {:04X}", address);
 
         match address {
             0x2000 => self.last_written_byte,
@@ -296,6 +296,7 @@ impl Ppu {
     /// Reads from the PPU address space
     fn read_byte(&self, address: u16) -> u8 {
         debug_assert!(address <= 0x3FFF);
+        //debug!("PPU address space read {:04X}", address);
 
         match address {
             0x0000..=0x3EFF => self.chr_address_bus.read_byte(address),
@@ -365,6 +366,11 @@ impl Ppu {
                     self.scanline_state.reload_shift_registers(); // TODO - Is this right? On cycle 9, 17, 25 ..., 257
                     self.scanline_state.nametable_byte =
                         self.read_byte(0x2000 | (self.internal_registers.vram_addr & 0x0FFF));
+
+                    debug!(
+                        "Tile address: {:04X}",
+                        0x2000 | (self.internal_registers.vram_addr & 0x0FFF)
+                    );
                 }
                 3 => {
                     let addr = 0x23C0
@@ -451,7 +457,10 @@ impl Ppu {
                     | (self.internal_registers.vram_addr & 0b0000_0100_0001_1111);
 
                 if cycle == 304 {
-                    debug!("Starting frame t={:04X} v={:04X}", self.internal_registers.temp_vram_addr, self.internal_registers.vram_addr);
+                    debug!(
+                        "Starting frame t={:04X} v={:04X}",
+                        self.internal_registers.temp_vram_addr, self.internal_registers.vram_addr
+                    );
                 }
             }
         }
@@ -510,7 +519,7 @@ impl Iterator for Ppu {
         };
 
         self.scanline_state.next_cycle();
-        if trigger_cycle_skip && self.ppu_mask.is_rendering_enabled(){
+        if trigger_cycle_skip && self.ppu_mask.is_rendering_enabled() {
             self.scanline_state.next_cycle()
         }
 
@@ -518,20 +527,18 @@ impl Iterator for Ppu {
     }
 }
 
-
 #[cfg(test)]
 mod ppu_tests {
-    use ppu::CartridgeAddressBus;
     use super::Ppu;
-    
-    struct FakeCartridge {
-    }
+    use ppu::CartridgeAddressBus;
+
+    struct FakeCartridge {}
 
     impl CartridgeAddressBus for FakeCartridge {
         fn read_byte(&self, _: u16) -> u8 {
             0x0
         }
-    
+
         fn write_byte(&mut self, _: u16, _: u8, _: u32) {}
     }
 

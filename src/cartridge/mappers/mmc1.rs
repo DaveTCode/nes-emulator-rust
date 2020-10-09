@@ -101,7 +101,9 @@ impl MMC1PrgChip {
         self.chr_bank[bank] = match self.control_register.chr_bank_mode {
             CHRBankMode::Switch4KB => value & 0b1_1111,
             CHRBankMode::Switch8KB => (value >> 1) & 0b1111,
-        }
+        };
+
+        debug!("CHR banks updated to {:02X}, {:02X}", self.chr_bank[0], self.chr_bank[1]);
     }
 
     fn update_prg_bank(&mut self, value: u8) {
@@ -111,6 +113,8 @@ impl MMC1PrgChip {
             PRGBankMode::Switch32KB => (value >> 1) & 0b111,
             _ => value & 0b1111,
         } % self.prg_banks;
+
+        debug!("PRG Bank updated to {:02X}", self.prg_bank);
 
         self.update_bank_offsets();
     }
@@ -127,8 +131,8 @@ impl MMC1PrgChip {
                 self.prg_bank_offsets[1] = self.prg_rom.len() as u32 - 0x4000;
             }
             PRGBankMode::Switch32KB => {
-                self.prg_bank_offsets[0] = 0;
-                self.prg_bank_offsets[1] = (self.prg_bank as u32 & 0xF) * 0x4000;
+                self.prg_bank_offsets[0] = (self.prg_bank as u32 & 0xF) * 0x8000;
+                self.prg_bank_offsets[1] = self.prg_bank_offsets[0] + 0x4000;
             }
         };
 
@@ -159,7 +163,7 @@ impl CartridgeAddressBus for MMC1PrgChip {
 
                 self.prg_rom[adj_addr + self.prg_bank_offsets[1] as usize]
             }
-            _ => todo!("Not yet mapped addresses in zero mapper {:04X}", address),
+            _ => todo!("Not yet mapped addresses in MMC1 {:04X}", address),
         }
     }
 
@@ -189,9 +193,9 @@ impl CartridgeAddressBus for MMC1PrgChip {
                     if self.shift_writes == 5 {
                         match address {
                             0x8000..=0x9FFF => self.update_control_register(value),
-                            0xA000..=0xBFFF => self.update_chr_bank(value, 0),
-                            0xC000..=0xDFFF => self.update_chr_bank(value, 1),
-                            0xE000..=0xFFFF => self.update_prg_bank(value),
+                            0xA000..=0xBFFF => self.update_chr_bank(self.load_register, 0),
+                            0xC000..=0xDFFF => self.update_chr_bank(self.load_register, 1),
+                            0xE000..=0xFFFF => self.update_prg_bank(self.load_register),
                             _ => panic!("Invalid MMC1 address {:04X}={:02X}", address, value),
                         }
 
@@ -239,7 +243,7 @@ impl CartridgeAddressBus for MMC1ChrChip {
     }
 
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
-        info!("MMC1 write {:04X}={:02X}", address, value);
+        info!("MMC1 CHR write {:04X}={:02X}", address, value);
         match address {
             0x0000..=0x1FFF => match &mut self.chr_data {
                 ChrData::Rom(_) => (),

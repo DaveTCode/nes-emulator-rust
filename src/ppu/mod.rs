@@ -231,7 +231,7 @@ impl Ppu {
                 match self.internal_registers.write_toggle {
                     false => {
                         self.internal_registers.temp_vram_addr =
-                            self.internal_registers.temp_vram_addr & 0xFF
+                            (self.internal_registers.temp_vram_addr & 0xFF)
                                 | (((value as u16) & 0b0011_1111) << 8);
                     }
                     true => {
@@ -449,6 +449,10 @@ impl Ppu {
                 self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr
                     & 0b1111_1011_1110_0000)
                     | (self.internal_registers.vram_addr & 0b0000_0100_0001_1111);
+
+                if cycle == 304 {
+                    debug!("Starting frame t={:04X} v={:04X}", self.internal_registers.temp_vram_addr, self.internal_registers.vram_addr);
+                }
             }
         }
     }
@@ -511,5 +515,42 @@ impl Iterator for Ppu {
         }
 
         None // PPU never exits by itself
+    }
+}
+
+
+#[cfg(test)]
+mod ppu_tests {
+    use ppu::CartridgeAddressBus;
+    use super::Ppu;
+    
+    struct FakeCartridge {
+    }
+
+    impl CartridgeAddressBus for FakeCartridge {
+        fn read_byte(&self, _: u16) -> u8 {
+            0x0
+        }
+    
+        fn write_byte(&mut self, _: u16, _: u8, _: u32) {}
+    }
+
+    #[test]
+    fn test_setting_vram_addr() {
+        let mut ppu = Ppu::new(Box::new(FakeCartridge {}));
+        ppu.write_register(0x2000, 0);
+        ppu.read_register(0x2002);
+        ppu.write_register(0x2005, 0x7D);
+        assert_eq!(ppu.internal_registers.fine_x_scroll, 0b101);
+        ppu.write_register(0x2005, 0x5E);
+        assert_eq!(ppu.internal_registers.temp_vram_addr, 0b1100001_01101111);
+        assert_eq!(ppu.internal_registers.vram_addr, 0);
+        ppu.write_register(0x2006, 0x3D);
+        assert_eq!(ppu.internal_registers.temp_vram_addr, 0b0111101_01101111);
+        assert_eq!(ppu.internal_registers.vram_addr, 0);
+        ppu.write_register(0x2006, 0xF0);
+        assert_eq!(ppu.internal_registers.temp_vram_addr, 0b0111101_11110000);
+        assert_eq!(ppu.internal_registers.vram_addr, 0b0111101_11110000);
+        assert_eq!(ppu.internal_registers.fine_x_scroll, 0b101);
     }
 }

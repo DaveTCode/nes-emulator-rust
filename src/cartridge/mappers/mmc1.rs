@@ -114,7 +114,7 @@ impl MMC1PrgChip {
             _ => value & 0b1111,
         } % self.prg_banks;
 
-        debug!("PRG Bank updated to {:02X}", self.prg_bank);
+        info!("PRG Bank updated to {:02X}/{:02X}", self.prg_bank, self.prg_banks);
 
         self.update_bank_offsets();
     }
@@ -123,14 +123,14 @@ impl MMC1PrgChip {
         match self.control_register.prg_bank_mode {
             PRGBankMode::FixFirst16KB => {
                 self.prg_bank_offsets[0] = 0;
-                self.prg_bank_offsets[1] = (self.prg_bank as u32 & 0xF) * 0x4000;
+                self.prg_bank_offsets[1] = self.prg_bank as u32 * 0x4000;
             }
             PRGBankMode::FixLast16KB => {
-                self.prg_bank_offsets[0] = (self.prg_bank as u32 & 0xF) * 0x4000;
+                self.prg_bank_offsets[0] = self.prg_bank as u32 * 0x4000;
                 self.prg_bank_offsets[1] = self.prg_rom.len() as u32 - 0x4000;
             }
             PRGBankMode::Switch32KB => {
-                self.prg_bank_offsets[0] = ((self.prg_bank as u32 & 0xF) >> 1) * 0x4000;
+                self.prg_bank_offsets[0] = self.prg_bank as u32 * 0x4000;
                 self.prg_bank_offsets[1] = self.prg_bank_offsets[0] + 0x4000;
             }
         };
@@ -275,4 +275,48 @@ pub(crate) fn from_header(
         Box::new(MMC1ChrChip::new(chr_rom)),
         header,
     )
+}
+
+#[cfg(test)]
+mod mmc1_tests {
+    use super::MMC1PrgChip;
+    use cartridge::CartridgeAddressBus;
+
+    #[test]
+    fn test_change_bank() {
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        mmc1.write_byte(0xE000, 0b0001, 0);
+        mmc1.write_byte(0xE000, 0b0000, 0);
+        mmc1.write_byte(0xE000, 0b0000, 0);
+        mmc1.write_byte(0xE000, 0b0000, 0);
+        assert_eq!(mmc1.prg_bank, 0);
+        mmc1.write_byte(0xE000, 0b0000, 0);
+        assert_eq!(mmc1.prg_bank, 1);
+    }
+
+    #[test]
+    fn test_change_bank_needs_wrap() {
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 2], 2);
+        mmc1.write_byte(0xE000, 0b0011, 0);
+        mmc1.write_byte(0xE000, 0b0001, 0);
+        mmc1.write_byte(0xE000, 0b0000, 0);
+        mmc1.write_byte(0xE000, 0b0000, 0);
+        assert_eq!(mmc1.prg_bank, 0);
+        mmc1.write_byte(0xE000, 0b0000, 0);
+        assert_eq!(mmc1.prg_bank, 1);
+    }
+
+    #[test]
+    fn test_ignore_sequential_writes() {
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        mmc1.write_byte(0xE000, 0b0001, 0);
+        mmc1.write_byte(0xE000, 0b0000, 2);
+        mmc1.write_byte(0xE000, 0b0000, 4);
+        mmc1.write_byte(0xE000, 0b0000, 6);
+        assert_eq!(mmc1.prg_bank, 0);
+        mmc1.write_byte(0xE000, 0b0000, 7); // This write is ignored because it happens on the next cycle
+        assert_eq!(mmc1.prg_bank, 0);
+        mmc1.write_byte(0xE000, 0b0000, 9);
+        assert_eq!(mmc1.prg_bank, 1);
+    }
 }

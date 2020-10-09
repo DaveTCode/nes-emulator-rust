@@ -32,8 +32,7 @@ impl CartridgeAddressBus for MapperZeroPrgChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize], // TODO - Family basic model only
-            0x8000..=0xBFFF => self.prg_rom[(address - 0x8000) as usize],
-            0xC000..=0xFFFF => self.prg_rom[(address - 0xC000) as usize], // TODO! - Not true for NROM-256
+            0x8000..=0xFFFF => self.prg_rom[(address - 0x8000) as usize],
             _ => todo!("Not yet mapped addresses in zero mapper {:04X}", address),
         }
     }
@@ -89,10 +88,22 @@ pub(crate) fn from_header(
     Box<dyn CartridgeAddressBus>,
     CartridgeHeader,
 ) {
+    // NROM either has 16KB or 32KB of ROM, to make lookups faster we pre-
+    // mirror the ROM data into the second bank here
+    let full_prg_rom = match prg_rom.len() {
+        0x4000 => {
+            let mut full = prg_rom.clone();
+            full.extend(prg_rom.clone());
+
+            full
+        },
+        _ => prg_rom
+    };
+
     info!("Creating NROM mapper for cartridge");
     (
         Box::new(MapperZeroPrgChip {
-            prg_rom,
+            prg_rom: full_prg_rom,
             prg_ram: [0; 0x2000],
         }),
         Box::new(MapperZeroChrChip::new(chr_rom)),

@@ -2,7 +2,7 @@ mod palette;
 mod registers;
 
 use cartridge::PpuCartridgeAddressBus;
-use log::{debug, info};
+use log::{debug, info, error};
 use ppu::palette::PaletteRam;
 use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
 use ppu::registers::ppumask::PpuMask;
@@ -315,9 +315,9 @@ impl Ppu {
         }
     }
 
-    pub(crate) fn write_dma_byte(&mut self, value: u8) {
-        self.oam_ram[self.oam_addr as usize] = value;
-        self.oam_addr = self.oam_addr.wrapping_add(1);
+    pub(crate) fn write_dma_byte(&mut self, value: u8, dma_byte: u8) {
+        error!("DMA: {:02X}", self.oam_addr.wrapping_add(dma_byte));
+        self.oam_ram[self.oam_addr.wrapping_add(dma_byte) as usize] = value;
     }
 
     /// Writes to the PPU address space

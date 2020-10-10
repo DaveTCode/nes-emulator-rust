@@ -1051,7 +1051,7 @@ impl<'a> Cpu<'a> {
                 State::DmaState(DmaState::WriteCycle(value))
             }
             DmaState::WriteCycle(value) => {
-                self.ppu.write_dma_byte(value);
+                self.ppu.write_dma_byte(value, (self.dma_address - 1) as u8);
 
                 if self.dma_address & 0xFF == 0xFF {
                     State::CpuState(CpuState::FetchOpcode)

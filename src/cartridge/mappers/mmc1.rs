@@ -317,7 +317,7 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
                         address + self.chr_bank_offsets[1]
                     };
 
-                    rom[(adjusted_address & 0x2000) as usize]
+                    rom[adjusted_address as usize]
                 }
                 ChrData::Ram(ram) => ram[address as usize],
             },

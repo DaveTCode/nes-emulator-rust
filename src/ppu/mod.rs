@@ -1,6 +1,7 @@
 mod palette;
 mod registers;
 
+use ppu::palette::PaletteRam;
 use cartridge::PpuCartridgeAddressBus;
 use log::{debug, info};
 use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
@@ -119,7 +120,7 @@ impl InternalRegisters {
 pub(crate) struct Ppu {
     scanline_state: ScanlineState,
     oam_ram: [u8; 0x100],
-    palette_ram: [u8; 0x20],
+    palette_ram: PaletteRam,
     ppu_ctrl: PpuCtrl,
     ppu_mask: PpuMask,
     ppu_status: PpuStatus,
@@ -149,7 +150,9 @@ impl Ppu {
                 at_shift_register_low: 0,
             },
             oam_ram: [0; 0x100],
-            palette_ram: [0; 0x20],
+            palette_ram: PaletteRam {
+                data: [0; 0x20]
+            },
             ppu_ctrl: PpuCtrl::new(),
             ppu_mask: PpuMask::new(),
             ppu_status: PpuStatus::new(),
@@ -175,7 +178,7 @@ impl Ppu {
             vram_copy[i] = self.read_byte(i as u16);
         }
 
-        (&self.oam_ram, &self.palette_ram)
+        (&self.oam_ram, &self.palette_ram.data)
     }
 
     pub(crate) fn current_scanline(&self) -> u16 {
@@ -309,15 +312,9 @@ impl Ppu {
 
         match address {
             0x0000..=0x3EFF => self.chr_address_bus.read_byte(address),
-            0x3F00..=0x3F1F => {
-                let mirrored_address = match address {
-                    0x3F10 | 0x3F14 | 0x3F18 | 0x3F1C => address - 0x10,
-                    _ => address,
-                };
-
-                self.palette_ram[mirrored_address as usize - 0x3F00]
+            0x3F00..=0x3FFF => {
+                self.palette_ram.read_byte(address)
             }
-            0x3F20..=0x3FFF => self.read_byte(address & 0x1F), // Mirror these addresses back onto 3f00-3f1f
             _ => panic!("Invalid address for PPU {:04X}", address),
         }
     }
@@ -334,16 +331,8 @@ impl Ppu {
 
         match address {
             0x0000..=0x3EFF => self.chr_address_bus.write_byte(address, value, 0),
-            0x3F00..=0x3F1F => {
-                let mirrored_address = match address {
-                    0x3F10 | 0x3F14 | 0x3F18 | 0x3F1C => address - 0x10,
-                    _ => address,
-                };
-
-                self.palette_ram[mirrored_address as usize - 0x3F00] = value;
-            }
-            0x3F20..=0x3FFF => {
-                self.write_byte(address & 0x1F, value);
+            0x3F00..=0x3FFF => {
+                self.palette_ram.write_byte(address, value);
             }
             _ => panic!(
                 "Invalid address for PPU write {:04X}={:02X}",
@@ -372,20 +361,23 @@ impl Ppu {
         } else if cycle <= 256 || cycle >= 328 {
             match cycle % 8 {
                 0 => {
-                    self.scanline_state.bg_high_byte = self.read_byte(self.internal_registers.next_address);
+                    self.scanline_state.bg_high_byte =
+                        self.read_byte(self.internal_registers.next_address);
 
                     // Go to the next tile every 8 dots
                     self.internal_registers.increment_effective_scroll_x();
                 }
                 1 => {
-                    self.internal_registers.next_address = 0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
+                    self.internal_registers.next_address =
+                        0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
 
                     if cycle != 1 {
                         self.scanline_state.reload_shift_registers(); // TODO - Is this right? On cycle 9, 17, 25 ..., 257
                     }
                 }
                 2 => {
-                    self.scanline_state.nametable_byte = self.read_byte(self.internal_registers.next_address);
+                    self.scanline_state.nametable_byte =
+                        self.read_byte(self.internal_registers.next_address);
                 }
                 3 => {
                     self.internal_registers.next_address = 0x23C0
@@ -394,23 +386,27 @@ impl Ppu {
                         | ((self.internal_registers.vram_addr >> 2) & 0x07);
                 }
                 4 => {
-                    self.scanline_state.attribute_table_byte = self.read_byte(self.internal_registers.next_address);
+                    self.scanline_state.attribute_table_byte =
+                        self.read_byte(self.internal_registers.next_address);
                 }
                 5 => {
                     let tile_index = self.scanline_state.nametable_byte as u16 * 16;
-                    self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
-                        + tile_index
-                        + self.internal_registers.fine_y() as u16;
+                    self.internal_registers.next_address =
+                        self.ppu_ctrl.background_tile_table_select
+                            + tile_index
+                            + self.internal_registers.fine_y() as u16;
                 }
                 6 => {
-                    self.scanline_state.bg_low_byte = self.read_byte(self.internal_registers.next_address);
+                    self.scanline_state.bg_low_byte =
+                        self.read_byte(self.internal_registers.next_address);
                 }
                 7 => {
                     let tile_index = self.scanline_state.nametable_byte as u16 * 16;
-                    self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
-                        + tile_index
-                        + self.internal_registers.fine_y() as u16
-                        + 8;
+                    self.internal_registers.next_address =
+                        self.ppu_ctrl.background_tile_table_select
+                            + tile_index
+                            + self.internal_registers.fine_y() as u16
+                            + 8;
                 }
                 _ => panic!("Coding error, cycle {:}", cycle),
             }
@@ -424,21 +420,27 @@ impl Ppu {
 
         // Get background pixel
         // TODO - Handle masking left hand side
-        let bg_pixel = match self.ppu_mask.show_background {
-            true => self
+        let bg_pixel = match (
+            self.ppu_mask.show_background,
+            self.ppu_mask.show_background_left_side,
+            cycle,
+        ) {
+            (false, _, _) => 0x0,
+            (true, false, 0..=8) => 0x0,
+            _ => self
                 .scanline_state
                 .bg_pixel_palette(self.internal_registers.fine_x_scroll),
-            false => 0x0,
         };
 
         // Get sprite pixel
         // TODO - Handle masking left hand side for sprites
-        let _sprite_pixel = match self.ppu_mask.show_sprites {
-            true => 0x0, // TODO - Get the right sprite pixel
-            false => 0x0,
+        let _sprite_pixel = match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, cycle) {
+            (false, _, _) => 0x0,
+            (true, false, 0..=8) => 0x0,
+            _ => 0x0, // TODO - Get the right sprite pixel
         };
 
-        // TODO - Handle priorities
+        // TODO - Handle priorities & transparency
 
         // Read the palette value for the current pixel
         let palette_index = self.read_byte(0x3F00 | bg_pixel as u16) & 0x3F;

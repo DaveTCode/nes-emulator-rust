@@ -126,6 +126,7 @@ pub(crate) struct Ppu {
     ppu_status: PpuStatus,
     internal_registers: InternalRegisters,
     oam_addr: u8,
+    ppu_data_buffer: u8, // Internal buffer returned on PPUDATA reads
     last_written_byte: u8, // Stores the value last written onto the latch - TODO implement decay over time
     is_short_frame: bool,  // Every other frame the pre-render scanline takes one fewer cycle
     pub(crate) trigger_nmi: bool,
@@ -163,6 +164,7 @@ impl Ppu {
             },
             oam_addr: 0x0,
             last_written_byte: 0x0,
+            ppu_data_buffer: 0x0,
             is_short_frame: false,
             trigger_nmi: false,
             frame_buffer: [0; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
@@ -287,8 +289,18 @@ impl Ppu {
             0x2004 => self.oam_ram[self.oam_addr as usize],
             0x2005 => self.last_written_byte,
             0x2006 => self.last_written_byte,
+            // TODO - Buffer reads
             0x2007 => {
-                let value = self.read_byte(self.internal_registers.vram_addr);
+                let value = self.ppu_data_buffer;
+                self.ppu_data_buffer = match self.internal_registers.vram_addr {
+                    0x0000..=0x3EFF => {
+                        self.read_byte(self.internal_registers.vram_addr)
+                    }
+                    0x3F00..=0x3FFF => {
+                        self.read_byte(self.internal_registers.vram_addr - 0x1000)
+                    }
+                    _ => panic!("Invalid address for PPU {:04X}", address),
+                };
                 match self.ppu_ctrl.increment_mode {
                     IncrementMode::Add1GoingAcross => {
                         self.internal_registers.vram_addr += 1; // TODO - Does it wrap at 15 bits?

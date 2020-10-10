@@ -462,6 +462,11 @@ mod mmc1_tests {
     fn test_set_control_register() {
         let value = 0b1111;
         let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        mmc1.write_byte(0x8000, 0, 0);
+        mmc1.write_byte(0x8000, 0, 2);
+        mmc1.write_byte(0x8000, 0, 4);
+        mmc1.write_byte(0x8000, 0, 6);
+        mmc1.write_byte(0x8000, 0, 8);
         assert_eq!(mmc1.prg_bank_mode, PRGBankMode::Switch32KB);
         mmc1.write_byte(0x8000, value, 0);
         mmc1.write_byte(0x8000, value >> 1, 2);

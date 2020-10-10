@@ -38,6 +38,8 @@ impl ScanlineState {
     fn reload_shift_registers(&mut self) {
         self.bg_shift_register_high |= self.bg_high_byte as u16;
         self.bg_shift_register_low |= self.bg_low_byte as u16;
+
+        // TODO - Load attribute shift registers
     }
 
     /// Returns the index into the palette memory (0x00-0x3F) based on the
@@ -62,19 +64,25 @@ struct InternalRegisters {
     temp_vram_addr: u16,
     fine_x_scroll: u8,
     write_toggle: bool,
+    // Since each load takes two cycles, this handles the address to read from the PPU bus during the first of the two cycles
+    next_address: u16,
 }
 
 impl InternalRegisters {
-    fn fine_y(&self) -> u8 {
-        ((self.vram_addr >> 12) & 0b111) as u8
-    }
-
     fn coarse_x(&self) -> u8 {
         (self.vram_addr & 0b0001_1111) as u8
     }
 
     fn coarse_y(&self) -> u8 {
         ((self.vram_addr >> 5) & 0b0001_1111) as u8
+    }
+
+    fn nametable(&self) -> u8 {
+        ((self.vram_addr >> 10) & 0b111) as u8
+    }
+
+    fn fine_y(&self) -> u8 {
+        ((self.vram_addr >> 12) & 0b111) as u8
     }
 
     /// Shamelessly taken from https://wiki.nesdev.com/w/index.php?title=PPU_scrolling&redirect=no#Wrapping_around
@@ -89,7 +97,7 @@ impl InternalRegisters {
 
     /// Shamelessly taken from https://wiki.nesdev.com/w/index.php?title=PPU_scrolling&redirect=no#Wrapping_around
     fn incremement_effective_scroll_y(&mut self) {
-        if (self.vram_addr & 0x7000) != 0x7000 {
+        if self.fine_y() < 7 {
             self.vram_addr += 0x1000;
         } else {
             self.vram_addr &= !0x7000;
@@ -150,6 +158,7 @@ impl Ppu {
                 temp_vram_addr: 0,
                 fine_x_scroll: 0,
                 write_toggle: false,
+                next_address: 0,
             },
             oam_addr: 0x0,
             last_written_byte: 0x0,
@@ -361,44 +370,49 @@ impl Ppu {
                 & 0b1111_1011_1110_0000)
                 | (self.internal_registers.temp_vram_addr & 0b0000_0100_0001_1111);
         } else if cycle <= 256 || cycle >= 328 {
-            match cycle & 7 {
-                1 => {
-                    self.scanline_state.reload_shift_registers(); // TODO - Is this right? On cycle 9, 17, 25 ..., 257
-                    self.scanline_state.nametable_byte =
-                        self.read_byte(0x2000 | (self.internal_registers.vram_addr & 0x0FFF));
-
-                    debug!(
-                        "Tile address: {:04X}",
-                        0x2000 | (self.internal_registers.vram_addr & 0x0FFF)
-                    );
-                }
-                3 => {
-                    let addr = 0x23C0
-                        | (self.internal_registers.vram_addr & 0x0C00)
-                        | ((self.internal_registers.vram_addr >> 4) & 0x38)
-                        | ((self.internal_registers.vram_addr >> 2) & 0x07);
-                    self.scanline_state.attribute_table_byte = self.read_byte(addr);
-                }
-                5 => {
-                    let tile_index = self.scanline_state.nametable_byte as u16 * 16;
-                    let addr = self.ppu_ctrl.background_tile_table_select
-                        + tile_index
-                        + self.internal_registers.fine_y() as u16;
-                    self.scanline_state.bg_low_byte = self.read_byte(addr);
-                }
-                7 => {
-                    let tile_index = self.scanline_state.nametable_byte as u16 * 16;
-                    let addr = self.ppu_ctrl.background_tile_table_select
-                        + tile_index
-                        + self.internal_registers.fine_y() as u16
-                        + 8;
-                    self.scanline_state.bg_high_byte = self.read_byte(addr);
-                }
+            match cycle % 8 {
                 0 => {
+                    self.scanline_state.bg_high_byte = self.read_byte(self.internal_registers.next_address);
+
                     // Go to the next tile every 8 dots
                     self.internal_registers.increment_effective_scroll_x();
                 }
-                _ => (),
+                1 => {
+                    self.internal_registers.next_address = 0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
+
+                    if cycle != 1 {
+                        self.scanline_state.reload_shift_registers(); // TODO - Is this right? On cycle 9, 17, 25 ..., 257
+                    }
+                }
+                2 => {
+                    self.scanline_state.nametable_byte = self.read_byte(self.internal_registers.next_address);
+                }
+                3 => {
+                    self.internal_registers.next_address = 0x23C0
+                        | (self.internal_registers.vram_addr & 0x0C00)
+                        | ((self.internal_registers.vram_addr >> 4) & 0x38)
+                        | ((self.internal_registers.vram_addr >> 2) & 0x07);
+                }
+                4 => {
+                    self.scanline_state.attribute_table_byte = self.read_byte(self.internal_registers.next_address);
+                }
+                5 => {
+                    let tile_index = self.scanline_state.nametable_byte as u16 * 16;
+                    self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
+                        + tile_index
+                        + self.internal_registers.fine_y() as u16;
+                }
+                6 => {
+                    self.scanline_state.bg_low_byte = self.read_byte(self.internal_registers.next_address);
+                }
+                7 => {
+                    let tile_index = self.scanline_state.nametable_byte as u16 * 16;
+                    self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
+                        + tile_index
+                        + self.internal_registers.fine_y() as u16
+                        + 8;
+                }
+                _ => panic!("Coding error, cycle {:}", cycle),
             }
         }
     }

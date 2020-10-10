@@ -106,7 +106,10 @@ impl MMC1PrgChip {
             _ => panic!(),
         };
 
-        debug!("MMC1 Control register updated PRG bank mode : {:?}", self.prg_bank_mode);
+        debug!(
+            "MMC1 Control register updated PRG bank mode : {:?}",
+            self.prg_bank_mode
+        );
 
         self.update_bank_offsets();
     }
@@ -199,7 +202,9 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
 
                     if self.load_register.shift_writes == 5 {
                         match address {
-                            0x8000..=0x9FFF => self.update_control_register(self.load_register.value),
+                            0x8000..=0x9FFF => {
+                                self.update_control_register(self.load_register.value)
+                            }
                             0xA000..=0xBFFF => (), // Rust ownership...this write is handled by the CHR bus //self.update_chr_bank(self.load_register, 0),
                             0xC000..=0xDFFF => (), // Rust ownership...this write is handled by the CHR bus self.update_chr_bank(self.load_register, 1),
                             0xE000..=0xFFFF => self.update_prg_bank(self.load_register.value),
@@ -375,7 +380,9 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
 
                     if self.load_register.shift_writes == 5 {
                         match address {
-                            0x8000..=0x9FFF => self.update_control_register(self.load_register.value),
+                            0x8000..=0x9FFF => {
+                                self.update_control_register(self.load_register.value)
+                            }
                             0xA000..=0xBFFF => self.update_chr_bank(self.load_register.value, 0),
                             0xC000..=0xDFFF => self.update_chr_bank(self.load_register.value, 1),
                             0xE000..=0xFFFF => (), // Rust ownership...this write is handled by the PRG bus

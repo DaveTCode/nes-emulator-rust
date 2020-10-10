@@ -14,9 +14,13 @@ pub(super) struct PaletteRam {
 }
 
 fn mirrored_address(address: u16) -> u16 {
-    let mirrored_address = if address & 0x10 == 0x10 { address - 0x10 } else { address };
+    let mirrored_address = if address & 0x10 == 0x10 {
+        address - 0x10
+    } else {
+        address
+    };
 
-    mirrored_address & !0xE0 
+    mirrored_address & !0xE0
 }
 
 impl PaletteRam {
@@ -40,15 +44,24 @@ mod palette_ram_tests {
     #[test]
     fn test_mirrors() {
         let p = PaletteRam {
-            data: [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-                   0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F]
+            data: [
+                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+                0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
+                0x1C, 0x1D, 0x1E, 0x1F,
+            ],
         };
-        
+
         for i in 0x0..=0x20 {
             for bank in 0..7 {
                 let base_address = i + 0x3F00;
                 let mirrored_address = base_address + bank * 0x20;
-                assert_eq!(p.read_byte(base_address), p.read_byte(mirrored_address), "{:04X}!={:04X}", base_address, mirrored_address);
+                assert_eq!(
+                    p.read_byte(base_address),
+                    p.read_byte(mirrored_address),
+                    "{:04X}!={:04X}",
+                    base_address,
+                    mirrored_address
+                );
             }
         }
     }

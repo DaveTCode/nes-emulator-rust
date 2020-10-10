@@ -1,9 +1,9 @@
 mod palette;
 mod registers;
 
-use ppu::palette::PaletteRam;
 use cartridge::PpuCartridgeAddressBus;
 use log::{debug, info};
+use ppu::palette::PaletteRam;
 use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
 use ppu::registers::ppumask::PpuMask;
 use ppu::registers::ppustatus::PpuStatus;
@@ -150,9 +150,7 @@ impl Ppu {
                 at_shift_register_low: 0,
             },
             oam_ram: [0; 0x100],
-            palette_ram: PaletteRam {
-                data: [0; 0x20]
-            },
+            palette_ram: PaletteRam { data: [0; 0x20] },
             ppu_ctrl: PpuCtrl::new(),
             ppu_mask: PpuMask::new(),
             ppu_status: PpuStatus::new(),
@@ -312,9 +310,7 @@ impl Ppu {
 
         match address {
             0x0000..=0x3EFF => self.chr_address_bus.read_byte(address),
-            0x3F00..=0x3FFF => {
-                self.palette_ram.read_byte(address)
-            }
+            0x3F00..=0x3FFF => self.palette_ram.read_byte(address),
             _ => panic!("Invalid address for PPU {:04X}", address),
         }
     }
@@ -434,7 +430,11 @@ impl Ppu {
 
         // Get sprite pixel
         // TODO - Handle masking left hand side for sprites
-        let _sprite_pixel = match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, cycle) {
+        let _sprite_pixel = match (
+            self.ppu_mask.show_sprites,
+            self.ppu_mask.show_sprites_left_side,
+            cycle,
+        ) {
             (false, _, _) => 0x0,
             (true, false, 0..=8) => 0x0,
             _ => 0x0, // TODO - Get the right sprite pixel

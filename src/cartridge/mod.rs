@@ -37,10 +37,17 @@ impl From<ZipError> for CartridgeError {
     }
 }
 
-/// A trait representing the CPU/PPU address bus into the cartridge
-pub(crate) trait CartridgeAddressBus {
+/// A trait representing the CPU address bus into the cartridge
+pub(crate) trait CpuCartridgeAddressBus {
     fn read_byte(&self, address: u16) -> u8;
     fn write_byte(&mut self, address: u16, value: u8, cycles: u32);
+}
+
+/// A trait representing the CPU address bus into the cartridge
+pub(crate) trait PpuCartridgeAddressBus {
+    fn read_byte(&self, address: u16) -> u8;
+    fn write_byte(&mut self, address: u16, value: u8, cycles: u32);
+    fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: u32);
 }
 
 /// Represents flags/details about the rom from the header
@@ -66,8 +73,8 @@ pub(crate) fn from_file(
     file_path: &str,
 ) -> Result<
     (
-        Box<dyn CartridgeAddressBus>,
-        Box<dyn CartridgeAddressBus>,
+        Box<dyn CpuCartridgeAddressBus>,
+        Box<dyn PpuCartridgeAddressBus>,
         CartridgeHeader,
     ),
     CartridgeError,

@@ -1,6 +1,7 @@
 use apu::Apu;
-use cartridge::CartridgeAddressBus;
 use cartridge::CartridgeHeader;
+use cartridge::CpuCartridgeAddressBus;
+use cartridge::PpuCartridgeAddressBus;
 use cpu::Cpu;
 use io::Io;
 use io::{Button, Controller};
@@ -16,8 +17,8 @@ use std::{thread, time};
 pub(crate) fn run(
     screen_width: u32,
     screen_height: u32,
-    prg_address_bus: Box<dyn CartridgeAddressBus>,
-    chr_address_bus: Box<dyn CartridgeAddressBus>,
+    prg_address_bus: Box<dyn CpuCartridgeAddressBus>,
+    chr_address_bus: Box<dyn PpuCartridgeAddressBus>,
     cartridge_header: CartridgeHeader,
 ) {
     let sdl = sdl2::init().unwrap();

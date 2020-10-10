@@ -1,6 +1,7 @@
 use cartridge::mappers::ChrData;
-use cartridge::CartridgeAddressBus;
 use cartridge::CartridgeHeader;
+use cartridge::CpuCartridgeAddressBus;
+use cartridge::PpuCartridgeAddressBus;
 use log::{debug, info};
 
 pub(crate) struct MapperZeroPrgChip {
@@ -28,7 +29,7 @@ impl MapperZeroChrChip {
     }
 }
 
-impl CartridgeAddressBus for MapperZeroPrgChip {
+impl CpuCartridgeAddressBus for MapperZeroPrgChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize], // TODO - Family basic model only
@@ -40,12 +41,12 @@ impl CartridgeAddressBus for MapperZeroPrgChip {
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
         match address {
             0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize] = value, // TODO - Family basic model only
-            _ => (), // TODO - Do writes to anywhere else do anything?
+            _ => (),
         }
     }
 }
 
-impl CartridgeAddressBus for MapperZeroChrChip {
+impl PpuCartridgeAddressBus for MapperZeroChrChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x0000..=0x1FFF => match &self.chr_data {
@@ -77,6 +78,8 @@ impl CartridgeAddressBus for MapperZeroChrChip {
             ),
         }
     }
+
+    fn cpu_write_byte(&mut self, _: u16, _: u8, _: u32) {}
 }
 
 pub(crate) fn from_header(
@@ -84,8 +87,8 @@ pub(crate) fn from_header(
     chr_rom: Option<Vec<u8>>,
     header: CartridgeHeader,
 ) -> (
-    Box<dyn CartridgeAddressBus>,
-    Box<dyn CartridgeAddressBus>,
+    Box<dyn CpuCartridgeAddressBus>,
+    Box<dyn PpuCartridgeAddressBus>,
     CartridgeHeader,
 ) {
     // NROM either has 16KB or 32KB of ROM, to make lookups faster we pre-

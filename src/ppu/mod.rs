@@ -1,7 +1,7 @@
 mod palette;
 mod registers;
 
-use cartridge::CartridgeAddressBus;
+use cartridge::PpuCartridgeAddressBus;
 use log::{debug, info};
 use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
 use ppu::registers::ppumask::PpuMask;
@@ -122,11 +122,11 @@ pub(crate) struct Ppu {
     pub(crate) trigger_nmi: bool,
     pub(crate) frame_buffer: [u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
     priorities: [u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
-    chr_address_bus: Box<dyn CartridgeAddressBus>,
+    pub(crate) chr_address_bus: Box<dyn PpuCartridgeAddressBus>,
 }
 
 impl Ppu {
-    pub(super) fn new(chr_address_bus: Box<dyn CartridgeAddressBus>) -> Self {
+    pub(super) fn new(chr_address_bus: Box<dyn PpuCartridgeAddressBus>) -> Self {
         Ppu {
             scanline_state: ScanlineState {
                 scanline: 0,
@@ -530,16 +530,18 @@ impl Iterator for Ppu {
 #[cfg(test)]
 mod ppu_tests {
     use super::Ppu;
-    use ppu::CartridgeAddressBus;
+    use ppu::PpuCartridgeAddressBus;
 
     struct FakeCartridge {}
 
-    impl CartridgeAddressBus for FakeCartridge {
+    impl PpuCartridgeAddressBus for FakeCartridge {
         fn read_byte(&self, _: u16) -> u8 {
             0x0
         }
 
         fn write_byte(&mut self, _: u16, _: u8, _: u32) {}
+
+        fn cpu_write_byte(&mut self, _: u16, _: u8, _: u32) {}
     }
 
     #[test]

@@ -4,7 +4,7 @@ mod registers;
 mod status_flags;
 
 use apu::Apu;
-use cartridge::CartridgeAddressBus;
+use cartridge::CpuCartridgeAddressBus;
 use cpu::interrupts::Interrupt;
 use cpu::opcodes::Opcode;
 use cpu::opcodes::{AddressingMode, InstructionType, Operation, OPCODE_TABLE};
@@ -116,14 +116,14 @@ pub struct Cpu<'a> {
     apu: &'a mut Apu,
     io: &'a mut Io,
     ppu: &'a mut Ppu,
-    prg_address_bus: Box<dyn CartridgeAddressBus>,
+    prg_address_bus: Box<dyn CpuCartridgeAddressBus>,
     trigger_dma: bool,
     dma_address: u16,
 }
 
 impl<'a> Cpu<'a> {
     pub(crate) fn new(
-        prg_address_bus: Box<dyn CartridgeAddressBus>,
+        prg_address_bus: Box<dyn CpuCartridgeAddressBus>,
         apu: &'a mut Apu,
         io: &'a mut Io,
         ppu: &'a mut Ppu,
@@ -176,7 +176,14 @@ impl<'a> Cpu<'a> {
             } // Trigger DMA
             0x4016 => self.io.write_byte(address, value),                             // IO Register
             0x4018..=0x401F => (), // TODO - Unused APU & IO registers
-            0x4020..=0xFFFF => self.prg_address_bus.write_byte(address, value, self.cycles),
+            0x4020..=0xFFFF => {
+                // This is a bit...terrible. In order to avoid dual mutable ownership of the PRG/CHR areas of the cartridge
+                // all writes are mirrored between the two (although in practice only relevant writes are handled)
+                self.prg_address_bus.write_byte(address, value, self.cycles);
+                self.ppu
+                    .chr_address_bus
+                    .cpu_write_byte(address, value, self.cycles);
+            }
         }
     }
 

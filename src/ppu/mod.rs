@@ -2,7 +2,7 @@ mod palette;
 mod registers;
 
 use cartridge::PpuCartridgeAddressBus;
-use log::{debug, info, error};
+use log::{debug, error, info};
 use ppu::palette::PaletteRam;
 use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
 use ppu::registers::ppumask::PpuMask;
@@ -126,7 +126,7 @@ pub(crate) struct Ppu {
     ppu_status: PpuStatus,
     internal_registers: InternalRegisters,
     oam_addr: u8,
-    ppu_data_buffer: u8, // Internal buffer returned on PPUDATA reads
+    ppu_data_buffer: u8,   // Internal buffer returned on PPUDATA reads
     last_written_byte: u8, // Stores the value last written onto the latch - TODO implement decay over time
     is_short_frame: bool,  // Every other frame the pre-render scanline takes one fewer cycle
     pub(crate) trigger_nmi: bool,
@@ -293,12 +293,8 @@ impl Ppu {
             0x2007 => {
                 let value = self.ppu_data_buffer;
                 self.ppu_data_buffer = match self.internal_registers.vram_addr {
-                    0x0000..=0x3EFF => {
-                        self.read_byte(self.internal_registers.vram_addr)
-                    }
-                    0x3F00..=0x3FFF => {
-                        self.read_byte(self.internal_registers.vram_addr - 0x1000)
-                    }
+                    0x0000..=0x3EFF => self.read_byte(self.internal_registers.vram_addr),
+                    0x3F00..=0x3FFF => self.read_byte(self.internal_registers.vram_addr - 0x1000),
                     _ => panic!("Invalid address for PPU {:04X}", address),
                 };
                 match self.ppu_ctrl.increment_mode {

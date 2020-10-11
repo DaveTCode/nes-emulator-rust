@@ -96,7 +96,7 @@ pub(crate) fn from_header(
     let full_prg_rom = match prg_rom.len() {
         0x4000 => {
             let mut full = prg_rom.clone();
-            full.extend(prg_rom.clone());
+            full.extend(prg_rom);
 
             full
         }

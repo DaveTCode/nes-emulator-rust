@@ -3,6 +3,7 @@ use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
 use cpu::Cpu;
+use crc32fast::Hasher;
 use io::Io;
 use io::{Button, Controller};
 use log::info;
@@ -95,6 +96,15 @@ pub(crate) fn run(
                         Keycode::Right => cpu.button_down(Controller::One, Button::Right),
                         Keycode::Up => cpu.button_down(Controller::One, Button::Up),
                         Keycode::Down => cpu.button_down(Controller::One, Button::Down),
+                        Keycode::T => {
+                            let framebuffer = cpu.get_framebuffer();
+                            let cycles = cpu.cycles;
+                            let mut hasher = Hasher::new();
+                            hasher.update(framebuffer);
+                            let checksum = hasher.finalize();
+
+                            println!("Cycles: {:X}, FrameBuffer CRC32, {:}", cycles, checksum);
+                        }
                         Keycode::D => {
                             // Dump contents of PPU
                             let mut vram = [0; 0x4000];
@@ -104,7 +114,7 @@ pub(crate) fn run(
                             let mut palette_ram_file = File::create("palette_ram.csv").unwrap();
 
                             for b in vram.iter() {
-                                write!(vram_file, "{:02X}\n", b);
+                                writeln!(vram_file, "{:02X}", b);
                             }
                         }
                         _ => (),

@@ -109,7 +109,7 @@ enum CpuState {
 pub struct Cpu<'a> {
     state: State,
     registers: Registers,
-    cycles: u32,
+    pub(crate) cycles: u32,
     // TODO - apu_cycle_counter: u8,
     cpu_cycle_counter: u8,
     ram: [u8; 0x800],

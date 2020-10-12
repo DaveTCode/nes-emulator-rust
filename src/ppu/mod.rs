@@ -291,10 +291,13 @@ impl Ppu {
             0x2006 => self.last_written_byte,
             // TODO - Buffer reads
             0x2007 => {
-                let value = self.ppu_data_buffer;
+                let mut value = self.ppu_data_buffer;
                 self.ppu_data_buffer = match self.internal_registers.vram_addr {
                     0x0000..=0x3EFF => self.read_byte(self.internal_registers.vram_addr),
-                    0x3F00..=0x3FFF => self.read_byte(self.internal_registers.vram_addr - 0x1000),
+                    0x3F00..=0x3FFF => {
+                        value = self.palette_ram.read_byte(self.internal_registers.vram_addr);
+                        self.read_byte(self.internal_registers.vram_addr - 0x1000)
+                    }
                     _ => panic!("Invalid address for PPU {:04X}", address),
                 };
                 match self.ppu_ctrl.increment_mode {

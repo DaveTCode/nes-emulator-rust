@@ -21,7 +21,7 @@ loggers:
   rust_nes::cpu:
     level: error
     appenders:
-      - nes_test
+      - file
   rust_nes::ppu:
     level: error
     appenders:

@@ -34,12 +34,13 @@ steps:
   - script: cargo build
     displayName: Full build
   - script: cargo test
-    displayName: Run all tests (non-linux)
-    condition: ne( variables['Agent.OS'], 'Linux' )
+    displayName: Run all tests (non-windows)
+    condition: ne( variables['Agent.OS'], 'Windows_NT' )
   - script: |
       cargo install cargo2junit
       cargo test -- -Z unstable-options --format json | cargo2junit > results.xml
-    condition: eq( variables['Agent.OS'], 'Linux' )
+    displayName: Run all tests (windows) + generate reports
+    condition: eq( variables['Agent.OS'], 'Windows_NT' )
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'JUnit'

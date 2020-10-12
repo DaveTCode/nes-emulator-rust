@@ -33,14 +33,10 @@ steps:
     condition: eq( variables['Agent.OS'], 'Windows_NT' )
   - script: cargo build
     displayName: Full build
-  - script: cargo test
-    displayName: Run all tests (non-windows)
-    condition: ne( variables['Agent.OS'], 'Windows_NT' )
   - script: |
       cargo install cargo2junit
       cargo test -- -Z unstable-options --format json | cargo2junit > results.xml
-    displayName: Run all tests (windows) + generate reports
-    condition: eq( variables['Agent.OS'], 'Windows_NT' )
+    displayName: Run all tests + generate reports
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'JUnit'

@@ -34,4 +34,14 @@ steps:
   - script: cargo build
     displayName: Full build
   - script: cargo test
-    displayName: Run all tests
+    displayName: Run all tests (non-linux)
+    condition: ne( variables['Agent.OS'], 'Linux' )
+  - script: |
+      cargo install cargo2junit
+      cargo test -- -Z unstable-options --format json | cargo2junit > results.xml
+    condition: eq( variables['Agent.OS'], 'Linux' )
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: 'results.xml'
+    condition: succeededOrFailed()

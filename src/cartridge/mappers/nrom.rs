@@ -1,3 +1,4 @@
+use cartridge::MirroringMode;
 use cartridge::mappers::ChrData;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
@@ -12,18 +13,21 @@ pub(crate) struct MapperZeroPrgChip {
 pub(crate) struct MapperZeroChrChip {
     chr_data: ChrData,
     ppu_vram: [u8; 0x1000],
+    mirroring_mode: MirroringMode,
 }
 
 impl MapperZeroChrChip {
-    fn new(chr_rom: Option<Vec<u8>>) -> Self {
+    fn new(chr_rom: Option<Vec<u8>>, mirroring_mode: MirroringMode) -> Self {
         match chr_rom {
             Some(rom) => MapperZeroChrChip {
                 chr_data: ChrData::Rom(rom),
                 ppu_vram: [0; 0x1000],
+                mirroring_mode,
             },
             None => MapperZeroChrChip {
                 chr_data: ChrData::Ram([0; 0x2000]),
                 ppu_vram: [0; 0x1000],
+                mirroring_mode,
             },
         }
     }
@@ -53,7 +57,10 @@ impl PpuCartridgeAddressBus for MapperZeroChrChip {
                 ChrData::Rom(rom) => rom[address as usize],
                 ChrData::Ram(ram) => ram[address as usize],
             },
-            0x2000..=0x2FFF => self.ppu_vram[(address - 0x2000) as usize],
+            0x2000..=0x3EFF => {
+                let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
+                self.ppu_vram[mirrored_address as usize]
+            },
             0x3000..=0x3EFF => self.ppu_vram[(address - 0x3000) as usize],
             _ => todo!("Not yet mapped addresses in zero mapper {:04X}", address),
         }
@@ -109,7 +116,7 @@ pub(crate) fn from_header(
             prg_rom: full_prg_rom,
             prg_ram: [0; 0x2000],
         }),
-        Box::new(MapperZeroChrChip::new(chr_rom)),
+        Box::new(MapperZeroChrChip::new(chr_rom, header.mirroring)),
         header,
     )
 }

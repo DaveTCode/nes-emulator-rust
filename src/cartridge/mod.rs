@@ -1,5 +1,7 @@
 mod mappers;
+mod mirroring;
 
+use cartridge::mirroring::MirroringMode;
 use log::info;
 use std::error::Error;
 use std::ffi::OsStr;
@@ -56,6 +58,7 @@ pub(crate) struct CartridgeHeader {
     pub(crate) prg_rom_16kb_units: u8,
     pub(crate) chr_rom_8kb_units: u8,
     pub(crate) mapper: u8,
+    pub(crate) mirroring: MirroringMode,
     // TODO - Lots more flags and possible options
 }
 
@@ -125,6 +128,10 @@ pub(crate) fn from_file(
         prg_rom_16kb_units: bytes[4],
         chr_rom_8kb_units: bytes[5],
         mapper: (bytes[6] >> 4) | (bytes[7] & 0b1111_0000),
+        mirroring: match bytes[6] & 1 == 0 {
+            true => MirroringMode::Horizontal,
+            false => MirroringMode::Vertical,
+        }
     };
 
     info!("{}: {:02X} {:02X}", header, bytes[6], bytes[7]);

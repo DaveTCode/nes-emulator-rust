@@ -36,6 +36,13 @@ impl ScanlineState {
         }
     }
 
+    fn shift_bg_registers(&mut self) {
+        self.bg_shift_register_high <<= 1;
+        self.bg_shift_register_low <<= 1;
+        self.at_shift_register_low <<= 1;
+        self.at_shift_register_high <<= 1;
+    }
+
     fn reload_shift_registers(&mut self) {
         self.bg_shift_register_high |= self.bg_high_byte as u16;
         self.bg_shift_register_low |= self.bg_low_byte as u16;
@@ -45,16 +52,14 @@ impl ScanlineState {
 
     /// Returns the index into the palette memory (0x00-0x3F) based on the
     /// current values of the shift registers
-    fn bg_pixel_palette(&self, fine_x_scroll: u8) -> u8 {
+    fn bg_pixel_palette(&self, fine_x_scroll: u8, coarse_x: u8, coarse_y: u8) -> u8 {
         debug_assert!(fine_x_scroll <= 7);
 
         let color_low_bit = (self.bg_shift_register_low >> (15 - fine_x_scroll)) & 1;
         let color_high_bit = (self.bg_shift_register_high >> (15 - fine_x_scroll)) & 1;
         let color_index = color_low_bit | (color_high_bit << 1);
 
-        let pl_low_bit = (self.at_shift_register_low >> (7 - fine_x_scroll)) & 1;
-        let pl_high_bit = (self.at_shift_register_high >> (7 - fine_x_scroll)) & 1;
-        let palette_index = pl_low_bit | (pl_high_bit << 1);
+        let palette_index = (self.attribute_table_byte >> ((coarse_x & 0x2) | ((coarse_y & 0x2) << 1))) & 0x3;
 
         (palette_index << 2) | color_index as u8
     }
@@ -357,66 +362,99 @@ impl Ppu {
                 self.scanline_state.nametable_byte =
                     self.read_byte(0x2000 | (self.internal_registers.vram_addr & 0x0FFF));
             }
-        } else if cycle == 256 {
-            // Move to the next row of tiles at dot 256
-            self.internal_registers.incremement_effective_scroll_y();
-        } else if cycle == 257 {
-            // Copy horizontal data from temporary vram address to vram address at dot 257
-            self.internal_registers.vram_addr = (self.internal_registers.vram_addr
-                & 0b1111_1011_1110_0000)
-                | (self.internal_registers.temp_vram_addr & 0b0000_0100_0001_1111);
-        } else if cycle <= 256 || cycle >= 328 {
-            match cycle % 8 {
-                0 => {
+
+            return;
+        } 
+
+        match cycle & 7 {
+            0 => {
+                if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.bg_high_byte =
                         self.read_byte(self.internal_registers.next_address);
 
                     // Go to the next tile every 8 dots
                     self.internal_registers.increment_effective_scroll_x();
-                }
-                1 => {
-                    self.internal_registers.next_address =
-                        0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
 
-                    if cycle != 1 {
-                        self.scanline_state.reload_shift_registers(); // TODO - Is this right? On cycle 9, 17, 25 ..., 257
+                    // Once per frame increment y to the next row
+                    if cycle == 256 {
+                        // Move to the next row of tiles at dot 256
+                        self.internal_registers.incremement_effective_scroll_y();
+                    } 
+                } else {
+                    // TODO - Get sprite pattern table high byte
+                }
+            }
+            1 => {
+                if (cycle >= 9 && cycle <= 257) || (cycle >= 329 && cycle <= 337) {
+                    self.scanline_state.reload_shift_registers();
+
+                    if cycle == 257 {
+                        // Copy horizontal data from temporary vram address to vram address at dot 257
+                        self.internal_registers.vram_addr = (self.internal_registers.vram_addr
+                            & 0b1111_1011_1110_0000)
+                            | (self.internal_registers.temp_vram_addr & 0b0000_0100_0001_1111);
                     }
                 }
-                2 => {
+
+                self.internal_registers.next_address =
+                    0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
+            }
+            2 => {
+                if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.nametable_byte =
                         self.read_byte(self.internal_registers.next_address);
+                } else {
+                    self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
                 }
-                3 => {
+            }
+            3 => {
+                if cycle <= 256 || cycle >= 321 {
                     self.internal_registers.next_address = 0x23C0
                         | (self.internal_registers.vram_addr & 0x0C00)
                         | ((self.internal_registers.vram_addr >> 4) & 0x38)
                         | ((self.internal_registers.vram_addr >> 2) & 0x07);
                 }
-                4 => {
+            }
+            4 => {
+                if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.attribute_table_byte =
                         self.read_byte(self.internal_registers.next_address);
+                } else {
+                    self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
                 }
-                5 => {
+            }
+            5 => {
+                if cycle <= 256 || cycle >= 321 {
                     let tile_index = self.scanline_state.nametable_byte as u16 * 16;
                     self.internal_registers.next_address =
                         self.ppu_ctrl.background_tile_table_select
                             + tile_index
                             + self.internal_registers.fine_y() as u16;
+                } else {
+                    // TODO - Where does the sprite tile index come from here?
                 }
-                6 => {
+            }
+            6 => {
+                if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.bg_low_byte =
                         self.read_byte(self.internal_registers.next_address);
+                } else {
+                    // TODO - Where to store the sprite tile byte
                 }
-                7 => {
+            }
+            7 => {
+                if cycle <= 256 || cycle >= 321 {
                     let tile_index = self.scanline_state.nametable_byte as u16 * 16;
                     self.internal_registers.next_address =
                         self.ppu_ctrl.background_tile_table_select
                             + tile_index
                             + self.internal_registers.fine_y() as u16
                             + 8;
+                } else {
+                    // TODO - Where does the sprite tile index come from here?
                 }
-                _ => panic!("Coding error, cycle {:}", cycle),
             }
+            _ => panic!("Coding error, cycle {:}", cycle)
         }
     }
 
@@ -436,7 +474,7 @@ impl Ppu {
             (true, false, 0..=8) => 0x0,
             _ => self
                 .scanline_state
-                .bg_pixel_palette(self.internal_registers.fine_x_scroll),
+                .bg_pixel_palette(self.internal_registers.fine_x_scroll, self.internal_registers.coarse_x(), self.internal_registers.coarse_y()),
         };
 
         // Get sprite pixel
@@ -462,12 +500,6 @@ impl Ppu {
         self.frame_buffer[offset + 1] = ((color >> 8) & 0xFF) as u8; // Green channel
         self.frame_buffer[offset + 2] = (color >> 16) as u8; // Red channel
         self.frame_buffer[offset + 3] = 0x00; // Alpha channel
-
-        // Finally shift the registers one bit to get ready for the next dot
-        self.scanline_state.bg_shift_register_high <<= 1;
-        self.scanline_state.bg_shift_register_low <<= 1;
-        self.scanline_state.at_shift_register_low <<= 1;
-        self.scanline_state.at_shift_register_high <<= 1;
     }
 
     fn handle_prerender_scanline_cycle(&mut self, cycle: u16) {
@@ -516,6 +548,12 @@ impl Iterator for Ppu {
                             self.scanline_state.scanline,
                             self.scanline_state.scanline_cycle,
                         );
+
+                        // Finally shift the registers one bit to get ready for the next dot
+                        self.scanline_state.shift_bg_registers();
+                    } else if self.scanline_state.scanline_cycle >= 322 && self.scanline_state.scanline_cycle <= 337 {
+                        // Finally shift the registers one bit to get ready for the next dot
+                        self.scanline_state.shift_bg_registers();
                     }
                 }
             }

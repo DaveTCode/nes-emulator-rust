@@ -73,7 +73,7 @@ impl PpuCartridgeAddressBus for MapperZeroChrChip {
                 ChrData::Rom(_) => (),
                 ChrData::Ram(ram) => ram[address as usize] = value,
             }
-            0x2000..=0x2FFF => {
+            0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
                 self.ppu_vram[mirrored_address as usize] = value;
             }

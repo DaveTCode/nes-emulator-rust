@@ -131,7 +131,7 @@ pub(crate) fn from_file(
         mirroring: match bytes[6] & 1 == 0 {
             true => MirroringMode::Horizontal,
             false => MirroringMode::Vertical,
-        }
+        },
     };
 
     info!("{}: {:02X} {:02X}", header, bytes[6], bytes[7]);

@@ -1,7 +1,7 @@
-use cartridge::MirroringMode;
 use cartridge::mappers::ChrData;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
+use cartridge::MirroringMode;
 use cartridge::PpuCartridgeAddressBus;
 use log::{debug, info};
 
@@ -60,7 +60,7 @@ impl PpuCartridgeAddressBus for MapperZeroChrChip {
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
                 self.ppu_vram[mirrored_address as usize]
-            },
+            }
             0x3000..=0x3EFF => self.ppu_vram[(address - 0x3000) as usize],
             _ => todo!("Not yet mapped addresses in zero mapper {:04X}", address),
         }

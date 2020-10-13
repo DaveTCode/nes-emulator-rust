@@ -1,7 +1,7 @@
-use cartridge::MirroringMode;
 use cartridge::mappers::ChrData;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
+use cartridge::MirroringMode;
 use cartridge::PpuCartridgeAddressBus;
 use log::{debug, info};
 

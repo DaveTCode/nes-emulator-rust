@@ -61,7 +61,6 @@ impl PpuCartridgeAddressBus for MapperZeroChrChip {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
                 self.ppu_vram[mirrored_address as usize]
             }
-            0x3000..=0x3EFF => self.ppu_vram[(address - 0x3000) as usize],
             _ => todo!("Not yet mapped addresses in zero mapper {:04X}", address),
         }
     }
@@ -73,9 +72,11 @@ impl PpuCartridgeAddressBus for MapperZeroChrChip {
             0x0000..=0x1FFF => match &mut self.chr_data {
                 ChrData::Rom(_) => (),
                 ChrData::Ram(ram) => ram[address as usize] = value,
-            },
-            0x2000..=0x2FFF => self.ppu_vram[(address - 0x2000) as usize] = value,
-            0x3000..=0x3EFF => self.ppu_vram[(address - 0x3000) as usize] = value,
+            }
+            0x2000..=0x2FFF => {
+                let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
+                self.ppu_vram[mirrored_address as usize] = value;
+            }
             0x3F00..=0x3FFF => panic!(
                 "Shouldn't be writing to palette registers through the cartridge address bus"
             ),

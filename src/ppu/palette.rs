@@ -1,3 +1,5 @@
+use log::error;
+
 pub(super) const PALETTE_2C02: [u32; 0x40] = [
     0x7C7C7C, 0x0000FC, 0x0000BC, 0x4428BC, 0x940084, 0xA80020, 0xA81000, 0x881400, 0x503000, 0x007800, 0x006800,
     0x005800, 0x004058, 0x000000, 0x000000, 0x000000, 0xBCBCBC, 0x0078F8, 0x0058F8, 0x6844FC, 0xD800CC, 0xE40058,
@@ -7,31 +9,34 @@ pub(super) const PALETTE_2C02: [u32; 0x40] = [
     0xFCE0A8, 0xF8D878, 0xD8F878, 0xB8F8B8, 0xB8F8D8, 0x00FCFC, 0xF8D8F8, 0x000000, 0x000000,
 ];
 
+const palette_mirrors: [Option<usize>; 0x20] = [
+    Some(0x10), None, None, None, None, None, None, None,
+    Some(0x18), None, None, None, None, None, None, None,
+    Some(0x00), None, None, None, None, None, None, None,
+    Some(0x08), None, None, None, None, None, None, None,
+];
+
 pub(super) struct PaletteRam {
     pub(super) data: [u8; 0x20],
-}
-
-fn mirrored_address(address: u16) -> u16 {
-    let mirrored_address = if address & 0x10 == 0x10 {
-        address - 0x10
-    } else {
-        address
-    };
-
-    mirrored_address & !0xE0
 }
 
 impl PaletteRam {
     pub(super) fn read_byte(&self, address: u16) -> u8 {
         debug_assert!(address >= 0x3F00 && address <= 0x3FFF);
 
-        self.data[mirrored_address(address - 0x3F00) as usize]
+        self.data[address as usize & 0x1F]
     }
 
     pub(super) fn write_byte(&mut self, address: u16, value: u8) {
         debug_assert!(address >= 0x3F00 && address <= 0x3FFF);
 
-        self.data[mirrored_address(address - 0x3F00) as usize] = value;
+        let index = address as usize & 0x1F;
+        let mirror = palette_mirrors[index];
+        self.data[index] = value;
+        
+        if let Some(mirrored_address) = mirror {
+            self.data[mirrored_address] = value;
+        }
     }
 }
 

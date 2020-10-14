@@ -115,7 +115,7 @@ impl SpriteData {
 
 impl super::Ppu {
     // TODO - I'm not doing anything with sprite zero hits here, not sure exactly the best time to sort that
-    pub(super) fn get_sprite_pixel(&mut self, x: u32, y: u32, fine_x_scroll: u8) -> (u8, bool) {
+    pub(super) fn get_sprite_pixel(&mut self) -> (u8, bool) {
         for i in 0..8 {
             if self.sprite_data.sprite_x_counters[i] != 0 {
                 self.sprite_data.sprite_x_counters[i] -= 1;

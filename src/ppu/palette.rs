@@ -9,7 +9,7 @@ pub(super) const PALETTE_2C02: [u32; 0x40] = [
     0xFCE0A8, 0xF8D878, 0xD8F878, 0xB8F8B8, 0xB8F8D8, 0x00FCFC, 0xF8D8F8, 0x000000, 0x000000,
 ];
 
-const palette_mirrors: [Option<usize>; 0x20] = [
+const PALETTE_MIRRORS: [Option<usize>; 0x20] = [
     Some(0x10), None, None, None, None, None, None, None,
     Some(0x18), None, None, None, None, None, None, None,
     Some(0x00), None, None, None, None, None, None, None,
@@ -31,7 +31,7 @@ impl PaletteRam {
         debug_assert!(address >= 0x3F00 && address <= 0x3FFF);
 
         let index = address as usize & 0x1F;
-        let mirror = palette_mirrors[index];
+        let mirror = PALETTE_MIRRORS[index];
         self.data[index] = value;
         
         if let Some(mirrored_address) = mirror {

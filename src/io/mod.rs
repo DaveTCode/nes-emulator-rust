@@ -129,10 +129,7 @@ impl Io {
     }
 
     pub(crate) fn write_byte(&mut self, address: u16, value: u8) {
-        debug!(
-            "Writing to controller register {:04X}={:02X}",
-            address, value
-        );
+        debug!("Writing to controller register {:04X}={:02X}", address, value);
 
         match address {
             0x4016 => {

@@ -23,8 +23,7 @@ use ppu::SCREEN_HEIGHT;
 use ppu::SCREEN_WIDTH;
 
 pub fn run(rom_file: String) {
-    let (prg_address_bus, chr_address_bus, cartridge_header) = match cartridge::from_file(&rom_file)
-    {
+    let (prg_address_bus, chr_address_bus, cartridge_header) = match cartridge::from_file(&rom_file) {
         Err(why) => panic!("Failed to load cartridge: {}", why.message),
         Ok(cartridge) => cartridge,
     };
@@ -35,10 +34,7 @@ pub fn run(rom_file: String) {
 }
 
 /// Run a rom for N cycles and return the CRC32 checksum of the framebuffer
-pub fn run_headless_cycles(
-    rom_file: &str,
-    cycles: usize,
-) -> [u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize] {
+pub fn run_headless_cycles(rom_file: &str, cycles: usize) -> [u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize] {
     let (prg_address_bus, chr_address_bus, _) = match cartridge::from_file(&rom_file) {
         Err(why) => panic!("Failed to load cartridge: {}", why.message),
         Ok(cartridge) => cartridge,

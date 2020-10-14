@@ -1,5 +1,6 @@
 mod palette;
 mod registers;
+mod sprites;
 
 use cartridge::PpuCartridgeAddressBus;
 use log::{debug, error, info};
@@ -7,6 +8,9 @@ use ppu::palette::PaletteRam;
 use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
 use ppu::registers::ppumask::PpuMask;
 use ppu::registers::ppustatus::PpuStatus;
+use ppu::sprites::SpriteData;
+use ppu::sprites::MAX_SPRITES;
+use ppu::sprites::MAX_SPRITES_PER_LINE;
 
 pub(crate) const SCREEN_WIDTH: u32 = 256;
 pub(crate) const SCREEN_HEIGHT: u32 = 240;
@@ -124,13 +128,12 @@ impl InternalRegisters {
 
 pub(crate) struct Ppu {
     scanline_state: ScanlineState,
-    oam_ram: [u8; 0x100],
+    sprite_data: SpriteData,
     palette_ram: PaletteRam,
     ppu_ctrl: PpuCtrl,
     ppu_mask: PpuMask,
     ppu_status: PpuStatus,
     internal_registers: InternalRegisters,
-    oam_addr: u8,
     ppu_data_buffer: u8,   // Internal buffer returned on PPUDATA reads
     last_written_byte: u8, // Stores the value last written onto the latch - TODO implement decay over time
     is_short_frame: bool,  // Every other frame the pre-render scanline takes one fewer cycle
@@ -155,7 +158,7 @@ impl Ppu {
                 at_shift_register_high: 0,
                 at_shift_register_low: 0,
             },
-            oam_ram: [0; 0x100],
+            sprite_data: SpriteData::new(),
             palette_ram: PaletteRam { data: [0; 0x20] },
             ppu_ctrl: PpuCtrl::new(),
             ppu_mask: PpuMask::new(),
@@ -167,7 +170,6 @@ impl Ppu {
                 write_toggle: false,
                 next_address: 0,
             },
-            oam_addr: 0x0,
             last_written_byte: 0x0,
             ppu_data_buffer: 0x0,
             is_short_frame: false,
@@ -183,7 +185,7 @@ impl Ppu {
             vram_copy[i] = self.read_byte(i as u16);
         }
 
-        (&self.oam_ram, &self.palette_ram.data)
+        (&self.sprite_data.oam_ram, &self.palette_ram.data)
     }
 
     pub(crate) fn current_scanline(&self) -> u16 {
@@ -212,18 +214,13 @@ impl Ppu {
             0x2000 => {
                 // PPUCTRL
                 self.ppu_ctrl.write_byte(value);
-                self.internal_registers.temp_vram_addr = (self.internal_registers.temp_vram_addr
-                    & 0xF3FF)
-                    | ((value & 0b11) as u16) << 10;
+                self.internal_registers.temp_vram_addr =
+                    (self.internal_registers.temp_vram_addr & 0xF3FF) | ((value & 0b11) as u16) << 10;
             }
-            0x2001 => self.ppu_mask.write_byte(value), // PPUMASK
-            0x2002 => (),                              // PPUSTATUS
-            0x2003 => self.oam_addr = value,           // OAMADDR
-            0x2004 => {
-                // OAMDATA
-                self.oam_ram[self.oam_addr as usize] = value;
-                self.oam_addr = self.oam_addr.wrapping_add(1);
-            }
+            0x2001 => self.ppu_mask.write_byte(value),        // PPUMASK
+            0x2002 => (),                                     // PPUSTATUS
+            0x2003 => self.sprite_data.write_oam_addr(value), // OAMADDR
+            0x2004 => self.sprite_data.write_oam_data(value), // OAMDATA
             0x2005 => {
                 // PPUSCROLL
                 match self.internal_registers.write_toggle {
@@ -234,11 +231,9 @@ impl Ppu {
                     }
                     true => {
                         self.internal_registers.temp_vram_addr =
-                            (self.internal_registers.temp_vram_addr & 0x8FFF)
-                                | (((value & 0x7) as u16) << 12);
+                            (self.internal_registers.temp_vram_addr & 0x8FFF) | (((value & 0x7) as u16) << 12);
                         self.internal_registers.temp_vram_addr =
-                            (self.internal_registers.temp_vram_addr & 0xFC1F)
-                                | (((value & 0xF8) as u16) << 2);
+                            (self.internal_registers.temp_vram_addr & 0xFC1F) | (((value & 0xF8) as u16) << 2);
                     }
                 };
                 self.internal_registers.write_toggle = !self.internal_registers.write_toggle;
@@ -248,8 +243,7 @@ impl Ppu {
                 match self.internal_registers.write_toggle {
                     false => {
                         self.internal_registers.temp_vram_addr =
-                            (self.internal_registers.temp_vram_addr & 0xFF)
-                                | (((value as u16) & 0b0011_1111) << 8);
+                            (self.internal_registers.temp_vram_addr & 0xFF) | (((value as u16) & 0b0011_1111) << 8);
                     }
                     true => {
                         self.internal_registers.temp_vram_addr =
@@ -264,12 +258,12 @@ impl Ppu {
                 self.write_byte(self.internal_registers.vram_addr, value);
                 match self.ppu_ctrl.increment_mode {
                     IncrementMode::Add1GoingAcross => {
-                        self.internal_registers.vram_addr =
-                            (self.internal_registers.vram_addr + 1) & 0x3FFF; // TODO - Does it wrap at 15 bits?
+                        self.internal_registers.vram_addr = (self.internal_registers.vram_addr + 1) & 0x3FFF;
+                        // TODO - Does it wrap at 15 bits?
                     }
                     IncrementMode::Add32GoingDown => {
-                        self.internal_registers.vram_addr =
-                            (self.internal_registers.vram_addr + 32) & 0x3FFF; // TODO - Does it wrap at 15 bits?
+                        self.internal_registers.vram_addr = (self.internal_registers.vram_addr + 32) & 0x3FFF;
+                        // TODO - Does it wrap at 15 bits?
                     }
                 };
             }
@@ -291,7 +285,7 @@ impl Ppu {
                 self.ppu_status.read(self.last_written_byte)
             }
             0x2003 => self.last_written_byte,
-            0x2004 => self.oam_ram[self.oam_addr as usize],
+            0x2004 => self.sprite_data.read_oam_data(),
             0x2005 => self.last_written_byte,
             0x2006 => self.last_written_byte,
             // TODO - Buffer reads
@@ -332,8 +326,7 @@ impl Ppu {
     }
 
     pub(crate) fn write_dma_byte(&mut self, value: u8, dma_byte: u8) {
-        error!("DMA: {:02X}", self.oam_addr.wrapping_add(dma_byte));
-        self.oam_ram[self.oam_addr.wrapping_add(dma_byte) as usize] = value;
+        self.sprite_data.dma_write(value, dma_byte);
     }
 
     /// Writes to the PPU address space
@@ -346,10 +339,7 @@ impl Ppu {
             0x3F00..=0x3FFF => {
                 self.palette_ram.write_byte(address, value);
             }
-            _ => panic!(
-                "Invalid address for PPU write {:04X}={:02X}",
-                address, value
-            ),
+            _ => panic!("Invalid address for PPU write {:04X}={:02X}", address, value),
         }
     }
 
@@ -364,13 +354,12 @@ impl Ppu {
             }
 
             return;
-        } 
+        }
 
         match cycle & 7 {
             0 => {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
-                    self.scanline_state.bg_high_byte =
-                        self.read_byte(self.internal_registers.next_address);
+                    self.scanline_state.bg_high_byte = self.read_byte(self.internal_registers.next_address);
 
                     // Go to the next tile every 8 dots
                     self.internal_registers.increment_effective_scroll_x();
@@ -379,7 +368,7 @@ impl Ppu {
                     if cycle == 256 {
                         // Move to the next row of tiles at dot 256
                         self.internal_registers.incremement_effective_scroll_y();
-                    } 
+                    }
                 } else {
                     // TODO - Get sprite pattern table high byte
                 }
@@ -390,19 +379,16 @@ impl Ppu {
 
                     if cycle == 257 {
                         // Copy horizontal data from temporary vram address to vram address at dot 257
-                        self.internal_registers.vram_addr = (self.internal_registers.vram_addr
-                            & 0b1111_1011_1110_0000)
+                        self.internal_registers.vram_addr = (self.internal_registers.vram_addr & 0b1111_1011_1110_0000)
                             | (self.internal_registers.temp_vram_addr & 0b0000_0100_0001_1111);
                     }
                 }
 
-                self.internal_registers.next_address =
-                    0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
+                self.internal_registers.next_address = 0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
             }
             2 => {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
-                    self.scanline_state.nametable_byte =
-                        self.read_byte(self.internal_registers.next_address);
+                    self.scanline_state.nametable_byte = self.read_byte(self.internal_registers.next_address);
                 } else {
                     self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
                 }
@@ -417,8 +403,7 @@ impl Ppu {
             }
             4 => {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
-                    self.scanline_state.attribute_table_byte =
-                        self.read_byte(self.internal_registers.next_address);
+                    self.scanline_state.attribute_table_byte = self.read_byte(self.internal_registers.next_address);
                 } else {
                     self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
                 }
@@ -426,18 +411,16 @@ impl Ppu {
             5 => {
                 if cycle <= 256 || cycle >= 321 {
                     let tile_index = self.scanline_state.nametable_byte as u16 * 16;
-                    self.internal_registers.next_address =
-                        self.ppu_ctrl.background_tile_table_select
-                            + tile_index
-                            + self.internal_registers.fine_y() as u16;
+                    self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
+                        + tile_index
+                        + self.internal_registers.fine_y() as u16;
                 } else {
                     // TODO - Where does the sprite tile index come from here?
                 }
             }
             6 => {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
-                    self.scanline_state.bg_low_byte =
-                        self.read_byte(self.internal_registers.next_address);
+                    self.scanline_state.bg_low_byte = self.read_byte(self.internal_registers.next_address);
                 } else {
                     // TODO - Where to store the sprite tile byte
                 }
@@ -445,16 +428,15 @@ impl Ppu {
             7 => {
                 if cycle <= 256 || cycle >= 321 {
                     let tile_index = self.scanline_state.nametable_byte as u16 * 16;
-                    self.internal_registers.next_address =
-                        self.ppu_ctrl.background_tile_table_select
-                            + tile_index
-                            + self.internal_registers.fine_y() as u16
-                            + 8;
+                    self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
+                        + tile_index
+                        + self.internal_registers.fine_y() as u16
+                        + 8;
                 } else {
                     // TODO - Where does the sprite tile index come from here?
                 }
             }
-            _ => panic!("Coding error, cycle {:}", cycle)
+            _ => panic!("Coding error, cycle {:}", cycle),
         }
     }
 
@@ -472,27 +454,33 @@ impl Ppu {
         ) {
             (false, _, _) => 0x0,
             (true, false, 0..=8) => 0x0,
-            _ => self
-                .scanline_state
-                .bg_pixel_palette(self.internal_registers.fine_x_scroll, self.internal_registers.coarse_x(), self.internal_registers.coarse_y()),
+            _ => self.scanline_state.bg_pixel_palette(
+                self.internal_registers.fine_x_scroll,
+                self.internal_registers.coarse_x(),
+                self.internal_registers.coarse_y(),
+            ),
         };
 
         // Get sprite pixel
         // TODO - Handle masking left hand side for sprites
-        let _sprite_pixel = match (
-            self.ppu_mask.show_sprites,
-            self.ppu_mask.show_sprites_left_side,
-            cycle,
-        ) {
-            (false, _, _) => 0x0,
-            (true, false, 0..=8) => 0x0,
-            _ => 0x0, // TODO - Get the right sprite pixel
+        let (sprite_pixel, sprite_priority_over_bg) =
+            match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, cycle) {
+                (false, _, _) => (0x0, false),
+                (true, false, 0..=8) => (0x0, false),
+                _ => self.get_sprite_pixel(x, y, self.internal_registers.fine_x_scroll),
+            };
+
+        // Pass the resulting values through a priority multiplexer to get the final pixel value
+        let multiplexed_pixel = match (bg_pixel, sprite_pixel, sprite_priority_over_bg) {
+            (0, 0, _) => 0x0, // TODO - This is actually the default background color, not always 3F00
+            (0, _, _) => sprite_pixel,
+            (_, 0, _) => bg_pixel,
+            (_, _, false) => sprite_pixel,
+            (_, _, true) => bg_pixel,
         };
 
-        // TODO - Handle priorities & transparency
-
         // Read the palette value for the current pixel
-        let palette_index = self.read_byte(0x3F00 | bg_pixel as u16) & 0x3F;
+        let palette_index = self.read_byte(0x3F00 | multiplexed_pixel as u16) & 0x3F;
 
         let color = palette::PALETTE_2C02[palette_index as usize];
         let offset = ((SCREEN_WIDTH * y + x) * 4) as usize;
@@ -511,8 +499,7 @@ impl Ppu {
         } else if (cycle >= 280) && (cycle <= 304) {
             if self.ppu_mask.is_rendering_enabled() {
                 // Repeatedly copy vertical bits from temp addr to real addr to reinitialise pre-render
-                self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr
-                    & 0b1111_1011_1110_0000)
+                self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr & 0b1111_1011_1110_0000)
                     | (self.internal_registers.vram_addr & 0b0000_0100_0001_1111);
 
                 if cycle == 304 {
@@ -540,14 +527,15 @@ impl Iterator for Ppu {
             0..=239 => {
                 if self.ppu_mask.is_rendering_enabled() {
                     self.fetch_data(self.scanline_state.scanline_cycle);
+                    self.process_sprite_cycle(
+                        self.scanline_state.scanline,
+                        self.scanline_state.scanline_cycle,
+                        self.ppu_ctrl.sprite_size.pixels(),
+                        self.ppu_ctrl.sprite_tile_table_select,
+                    );
 
-                    if self.scanline_state.scanline_cycle >= 1
-                        && self.scanline_state.scanline_cycle <= 256
-                    {
-                        self.draw_pixel(
-                            self.scanline_state.scanline,
-                            self.scanline_state.scanline_cycle,
-                        );
+                    if self.scanline_state.scanline_cycle >= 1 && self.scanline_state.scanline_cycle <= 256 {
+                        self.draw_pixel(self.scanline_state.scanline, self.scanline_state.scanline_cycle);
 
                         // Finally shift the registers one bit to get ready for the next dot
                         self.scanline_state.shift_bg_registers();
@@ -572,6 +560,12 @@ impl Iterator for Ppu {
             261 => {
                 if self.ppu_mask.is_rendering_enabled() {
                     self.fetch_data(self.scanline_state.scanline_cycle);
+                    self.process_sprite_cycle(
+                        self.scanline_state.scanline,
+                        self.scanline_state.scanline_cycle,
+                        self.ppu_ctrl.sprite_size.pixels(),
+                        self.ppu_ctrl.sprite_tile_table_select,
+                    );
                 }
                 self.handle_prerender_scanline_cycle(self.scanline_state.scanline_cycle);
 

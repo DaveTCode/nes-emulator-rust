@@ -44,12 +44,7 @@ impl Opcode {
         }
     }
 
-    pub(super) fn execute(
-        &self,
-        cpu: &mut Cpu,
-        operand: Option<u8>,
-        address: Option<u16>,
-    ) -> State {
+    pub(super) fn execute(&self, cpu: &mut Cpu, operand: Option<u8>, address: Option<u16>) -> State {
         match self.operation {
             Operation::ADC => {
                 cpu.adc(operand.unwrap());
@@ -106,30 +101,22 @@ impl Opcode {
             }),
             Operation::BIT => {
                 let result = cpu.registers.a & operand.unwrap();
+                cpu.registers.status_register.set(StatusFlags::ZERO_FLAG, result == 0);
                 cpu.registers
                     .status_register
-                    .set(StatusFlags::ZERO_FLAG, result == 0);
-                cpu.registers.status_register.set(
-                    StatusFlags::OVERFLOW_FLAG,
-                    operand.unwrap() & 0b0100_0000 != 0,
-                );
-                cpu.registers.status_register.set(
-                    StatusFlags::NEGATIVE_FLAG,
-                    operand.unwrap() & 0b1000_0000 != 0,
-                );
+                    .set(StatusFlags::OVERFLOW_FLAG, operand.unwrap() & 0b0100_0000 != 0);
+                cpu.registers
+                    .status_register
+                    .set(StatusFlags::NEGATIVE_FLAG, operand.unwrap() & 0b1000_0000 != 0);
                 State::CpuState(CpuState::FetchOpcode)
             }
             Operation::BRK => State::InterruptState(InterruptState::PushPCH(Interrupt::IRQ_BRK)),
             Operation::CLC => {
-                cpu.registers
-                    .status_register
-                    .remove(StatusFlags::CARRY_FLAG);
+                cpu.registers.status_register.remove(StatusFlags::CARRY_FLAG);
                 State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CLD => {
-                cpu.registers
-                    .status_register
-                    .remove(StatusFlags::DECIMAL_FLAG);
+                cpu.registers.status_register.remove(StatusFlags::DECIMAL_FLAG);
                 State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CLI => {
@@ -139,9 +126,7 @@ impl Opcode {
                 State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CLV => {
-                cpu.registers
-                    .status_register
-                    .remove(StatusFlags::OVERFLOW_FLAG);
+                cpu.registers.status_register.remove(StatusFlags::OVERFLOW_FLAG);
                 State::CpuState(CpuState::FetchOpcode)
             }
             Operation::CMP => {
@@ -287,9 +272,7 @@ impl Opcode {
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::CpuState(CpuState::FetchOpcode)
             }
-            Operation::PHA => State::CpuState(CpuState::PushRegisterOnStack {
-                value: cpu.registers.a,
-            }),
+            Operation::PHA => State::CpuState(CpuState::PushRegisterOnStack { value: cpu.registers.a }),
             Operation::PHP => {
                 // Note that we mask bits 4, 5 here as this is called from an instruction
                 State::CpuState(CpuState::PushRegisterOnStack {
@@ -304,11 +287,7 @@ impl Opcode {
             }),
             Operation::RLA => {
                 let mut result = operand.unwrap() << 1;
-                if cpu
-                    .registers
-                    .status_register
-                    .contains(StatusFlags::CARRY_FLAG)
-                {
+                if cpu.registers.status_register.contains(StatusFlags::CARRY_FLAG) {
                     result |= 1;
                 }
                 cpu.registers
@@ -331,11 +310,7 @@ impl Opcode {
             }
             Operation::ROL => {
                 let mut result = operand.unwrap() << 1;
-                if cpu
-                    .registers
-                    .status_register
-                    .contains(StatusFlags::CARRY_FLAG)
-                {
+                if cpu.registers.status_register.contains(StatusFlags::CARRY_FLAG) {
                     result |= 1;
                 }
                 cpu.registers
@@ -357,11 +332,7 @@ impl Opcode {
             }
             Operation::ROR => {
                 let mut result = operand.unwrap() >> 1;
-                if cpu
-                    .registers
-                    .status_register
-                    .contains(StatusFlags::CARRY_FLAG)
-                {
+                if cpu.registers.status_register.contains(StatusFlags::CARRY_FLAG) {
                     result |= 0b1000_0000;
                 }
                 cpu.registers
@@ -383,11 +354,7 @@ impl Opcode {
             }
             Operation::RRA => {
                 let mut result = operand.unwrap() >> 1;
-                if cpu
-                    .registers
-                    .status_register
-                    .contains(StatusFlags::CARRY_FLAG)
-                {
+                if cpu.registers.status_register.contains(StatusFlags::CARRY_FLAG) {
                     result |= 0b1000_0000;
                 }
                 cpu.registers
@@ -423,15 +390,11 @@ impl Opcode {
                 State::CpuState(CpuState::FetchOpcode)
             }
             Operation::SEC => {
-                cpu.registers
-                    .status_register
-                    .insert(StatusFlags::CARRY_FLAG);
+                cpu.registers.status_register.insert(StatusFlags::CARRY_FLAG);
                 State::CpuState(CpuState::FetchOpcode)
             }
             Operation::SED => {
-                cpu.registers
-                    .status_register
-                    .insert(StatusFlags::DECIMAL_FLAG);
+                cpu.registers.status_register.insert(StatusFlags::DECIMAL_FLAG);
                 State::CpuState(CpuState::FetchOpcode)
             }
             Operation::SEI => {
@@ -666,9 +629,7 @@ impl Operation {
     pub(super) fn instruction_type(&self) -> InstructionType {
         match self {
             Operation::JMP | Operation::JSR => InstructionType::Jump,
-            Operation::STA | Operation::STX | Operation::STY | Operation::SAX => {
-                InstructionType::Write
-            }
+            Operation::STA | Operation::STX | Operation::STY | Operation::SAX => InstructionType::Write,
             Operation::ASL
             | Operation::LSR
             | Operation::ROL

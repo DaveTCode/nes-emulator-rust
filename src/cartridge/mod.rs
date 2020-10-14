@@ -105,8 +105,7 @@ pub(crate) fn from_file(
             match nes_files.first() {
                 None => {
                     return Err(CartridgeError {
-                        message: "The zip file must contain only one file with the .nes extension"
-                            .to_string(),
+                        message: "The zip file must contain only one file with the .nes extension".to_string(),
                     });
                 }
                 Some(zip_file_index) => {

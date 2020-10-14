@@ -73,10 +73,7 @@ impl MMC1PrgChip {
             _ => panic!(),
         };
 
-        debug!(
-            "MMC1 Control register updated PRG bank mode : {:?}",
-            self.prg_bank_mode
-        );
+        debug!("MMC1 Control register updated PRG bank mode : {:?}", self.prg_bank_mode);
 
         self.update_bank_offsets();
     }
@@ -89,10 +86,7 @@ impl MMC1PrgChip {
             _ => value & 0b1111,
         } % self.prg_banks;
 
-        info!(
-            "PRG Bank updated to {:02X}/{:02X}",
-            self.prg_bank, self.prg_banks
-        );
+        info!("PRG Bank updated to {:02X}/{:02X}", self.prg_bank, self.prg_banks);
 
         self.update_bank_offsets();
     }
@@ -169,9 +163,7 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
 
                     if self.load_register.shift_writes == 5 {
                         match address {
-                            0x8000..=0x9FFF => {
-                                self.update_control_register(self.load_register.value)
-                            }
+                            0x8000..=0x9FFF => self.update_control_register(self.load_register.value),
                             0xA000..=0xBFFF => (), // Rust ownership...this write is handled by the CHR bus //self.update_chr_bank(self.load_register, 0),
                             0xC000..=0xDFFF => (), // Rust ownership...this write is handled by the CHR bus self.update_chr_bank(self.load_register, 1),
                             0xE000..=0xFFFF => self.update_prg_bank(self.load_register.value),
@@ -299,9 +291,7 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
 
                 self.ppu_vram[mirrored_address as usize]
             }
-            0x3F00..=0x3FFF => {
-                panic!("Shouldn't be reading from palette RAM through cartridge bus")
-            }
+            0x3F00..=0x3FFF => panic!("Shouldn't be reading from palette RAM through cartridge bus"),
             _ => panic!("Reading from {:04X} invalid for CHR address bus", address),
         }
     }
@@ -318,13 +308,8 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
 
                 self.ppu_vram[mirrored_address as usize] = value;
             }
-            0x3F00..=0x3FFF => panic!(
-                "Shouldn't be writing to palette registers through the cartridge address bus"
-            ),
-            _ => panic!(
-                "Write to {:04X} ({:02X}) invalid for CHR address bus",
-                address, value
-            ),
+            0x3F00..=0x3FFF => panic!("Shouldn't be writing to palette registers through the cartridge address bus"),
+            _ => panic!("Write to {:04X} ({:02X}) invalid for CHR address bus", address, value),
         }
     }
 
@@ -347,9 +332,7 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
 
                     if self.load_register.shift_writes == 5 {
                         match address {
-                            0x8000..=0x9FFF => {
-                                self.update_control_register(self.load_register.value)
-                            }
+                            0x8000..=0x9FFF => self.update_control_register(self.load_register.value),
                             0xA000..=0xBFFF => self.update_chr_bank(self.load_register.value, 0),
                             0xC000..=0xDFFF => self.update_chr_bank(self.load_register.value, 1),
                             0xE000..=0xFFFF => (), // Rust ownership...this write is handled by the PRG bus

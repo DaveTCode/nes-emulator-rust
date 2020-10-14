@@ -72,18 +72,13 @@ impl PpuCartridgeAddressBus for MapperZeroChrChip {
             0x0000..=0x1FFF => match &mut self.chr_data {
                 ChrData::Rom(_) => (),
                 ChrData::Ram(ram) => ram[address as usize] = value,
-            }
+            },
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
                 self.ppu_vram[mirrored_address as usize] = value;
             }
-            0x3F00..=0x3FFF => panic!(
-                "Shouldn't be writing to palette registers through the cartridge address bus"
-            ),
-            _ => panic!(
-                "Write to {:04X} ({:02X}) invalid for CHR address bus",
-                address, value
-            ),
+            0x3F00..=0x3FFF => panic!("Shouldn't be writing to palette registers through the cartridge address bus"),
+            _ => panic!("Write to {:04X} ({:02X}) invalid for CHR address bus", address, value),
         }
     }
 

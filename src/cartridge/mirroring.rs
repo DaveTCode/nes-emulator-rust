@@ -19,7 +19,7 @@ impl MirroringMode {
                 } else {
                     adjusted_address & 0x3FF
                 }
-            },
+            }
             MirroringMode::OneScreenLowerBank => adjusted_address % 0x400,
             MirroringMode::OneScreenUpperBank => (adjusted_address % 0x400) + 0x400,
         }

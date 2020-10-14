@@ -33,11 +33,7 @@ pub(crate) fn run(
         .build()
         .unwrap();
 
-    let mut canvas = window
-        .into_canvas()
-        .build()
-        .map_err(|e| e.to_string())
-        .unwrap();
+    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string()).unwrap();
     let texture_creator = canvas.texture_creator();
 
     let mut texture = texture_creator
@@ -62,9 +58,7 @@ pub(crate) fn run(
             info!("Frame complete, polling for events and rendering");
 
             let framebuffer = cpu.get_framebuffer();
-            texture
-                .update(None, framebuffer, screen_width as usize * 4)
-                .unwrap();
+            texture.update(None, framebuffer, screen_width as usize * 4).unwrap();
             // texture.with_lock(None, |buffer: &mut [u8], _: usize| {
             //     buffer.copy_from_slice(framebuffer);
             // }).unwrap();
@@ -85,8 +79,7 @@ pub(crate) fn run(
                         break 'main;
                     }
                     Event::KeyDown {
-                        keycode: Some(keycode),
-                        ..
+                        keycode: Some(keycode), ..
                     } => match keycode {
                         Keycode::Z => cpu.button_down(Controller::One, Button::A),
                         Keycode::X => cpu.button_down(Controller::One, Button::B),
@@ -120,8 +113,7 @@ pub(crate) fn run(
                         _ => (),
                     },
                     Event::KeyUp {
-                        keycode: Some(keycode),
-                        ..
+                        keycode: Some(keycode), ..
                     } => match keycode {
                         Keycode::Z => cpu.button_up(Controller::One, Button::A),
                         Keycode::X => cpu.button_up(Controller::One, Button::B),

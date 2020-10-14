@@ -385,7 +385,7 @@ fn get_sprite_address(
     scanline: u16,
     pattern_table_base: u16,
 ) -> Option<u16> {
-    if scanline < y || scanline - y < sprite_height as u16 {
+    if scanline < y || scanline - y > sprite_height as u16 {
         return None;
     }
 
@@ -416,18 +416,18 @@ mod sprite_tests {
 
     #[test]
     fn test_get_sprite_address_x8() {
-        assert_eq!(get_sprite_address(200, 8, 0, 8, 202, 0x0), 0x0000 + (8 * 16) + 2);
-        assert_eq!(get_sprite_address(200, 8, 0, 8, 202, 0x1000), 0x1000 + (8 * 16) + 2);
+        assert_eq!(get_sprite_address(200, 8, 0, 8, 202, 0x0), Some(0x0000 + (8 * 16) + 2));
+        assert_eq!(get_sprite_address(200, 8, 0, 8, 202, 0x1000), Some(0x1000 + (8 * 16) + 2));
         assert_eq!(
             get_sprite_address(200, 8, 0b1000_0000, 8, 202, 0x1000),
-            0x1000 + (8 * 16) + 5
+            Some(0x1000 + (8 * 16) + 5)
         );
     }
 
     #[test]
     fn test_get_sprite_address_x16() {
-        assert_eq!(get_sprite_address(200, 8, 0, 16, 202, 0x0), 0x0000 + (8 * 16) + 2);
-        // assert_eq!(get_sprite_address(200, 8, 0, 16, 209, 0x0), 0x0000 + (8 * 16) + 9); - TODO - I think this seems right, so maybe my calculations above are wrong and large sprites won't currently work?
-        assert_eq!(get_sprite_address(200, 8, 0, 16, 202, 0x1000), 0x0000 + (8 * 16) + 2);
+        assert_eq!(get_sprite_address(200, 8, 0, 16, 202, 0x0), Some(0x0000 + (8 * 16) + 2));
+        // assert_eq!(get_sprite_address(200, 8, 0, 16, 209, 0x0), Some(0x0000 + (8 * 16) + 9)); - TODO - I think this seems right, so maybe my calculations above are wrong and large sprites won't currently work?
+        assert_eq!(get_sprite_address(200, 8, 0, 16, 202, 0x1000), Some(0x0000 + (8 * 16) + 2));
     }
 }

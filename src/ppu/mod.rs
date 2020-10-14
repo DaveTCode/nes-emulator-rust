@@ -492,10 +492,6 @@ impl Ppu {
         self.frame_buffer[offset + 1] = ((color >> 8) & 0xFF) as u8; // Green channel
         self.frame_buffer[offset + 2] = (color >> 16) as u8; // Red channel
         self.frame_buffer[offset + 3] = 0x00; // Alpha channel
-
-        if sprite_pixel != 0 {
-            error!("{:}, {:} - {:08b}, {:08b}, {:04X} = {:08X}", self.scanline_state.scanline, self.scanline_state.scanline_cycle, bg_pixel, multiplexed_pixel, (0x3F00 | multiplexed_pixel as u16), color);
-        }
     }
 
     fn handle_prerender_scanline_cycle(&mut self, cycle: u16) {

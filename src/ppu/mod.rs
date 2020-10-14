@@ -26,6 +26,8 @@ struct ScanlineState {
     bg_shift_register_low: u16,
     at_shift_register_high: u8,
     at_shift_register_low: u8,
+    at_shift_latch_high: u8,
+    at_shift_latch_low: u8,
 }
 
 impl ScanlineState {
@@ -43,27 +45,33 @@ impl ScanlineState {
     fn shift_bg_registers(&mut self) {
         self.bg_shift_register_high <<= 1;
         self.bg_shift_register_low <<= 1;
-        self.at_shift_register_low <<= 1;
-        self.at_shift_register_high <<= 1;
+        self.at_shift_register_low = (self.at_shift_register_low << 1) | self.at_shift_latch_low;
+        self.at_shift_register_high = (self.at_shift_register_high << 1) | self.at_shift_latch_high;
     }
 
-    fn reload_shift_registers(&mut self) {
+    fn reload_shift_registers(&mut self, coarse_x: u8, coarse_y: u8) {
         self.bg_shift_register_high |= self.bg_high_byte as u16;
         self.bg_shift_register_low |= self.bg_low_byte as u16;
 
-        // TODO - Load attribute shift registers
+        //at_bits = at_byte >> (((v >> 4) & 4) | ((v - 1) & 2));
+        let at_bits = self.attribute_table_byte >> (((coarse_y & 0b10) << 1) | (coarse_x  & 0b10)) & 0b11;
+
+        self.at_shift_latch_low = at_bits & 1;
+        self.at_shift_latch_high = (at_bits >> 1) & 1;
     }
 
     /// Returns the index into the palette memory (0x00-0x3F) based on the
     /// current values of the shift registers
-    fn bg_pixel_palette(&self, fine_x_scroll: u8, coarse_x: u8, coarse_y: u8) -> u8 {
+    fn bg_pixel_palette(&self, fine_x_scroll: u8) -> u8 {
         debug_assert!(fine_x_scroll <= 7);
 
         let color_low_bit = (self.bg_shift_register_low >> (15 - fine_x_scroll)) & 1;
         let color_high_bit = (self.bg_shift_register_high >> (15 - fine_x_scroll)) & 1;
         let color_index = color_low_bit | (color_high_bit << 1);
 
-        let palette_index = (self.attribute_table_byte >> ((coarse_x & 0x2) | ((coarse_y & 0x2) << 1))) & 0x3;
+        let palette_low_bit = (self.at_shift_register_low >> (7 - fine_x_scroll)) & 1;
+        let palette_high_bit = (self.at_shift_register_high >> (7 - fine_x_scroll)) & 1;
+        let palette_index = palette_low_bit | (palette_high_bit << 1);
 
         (palette_index << 2) | color_index as u8
     }
@@ -157,6 +165,8 @@ impl Ppu {
                 bg_shift_register_low: 0,
                 at_shift_register_high: 0,
                 at_shift_register_low: 0,
+                at_shift_latch_high: 0,
+                at_shift_latch_low: 0,
             },
             sprite_data: SpriteData::new(),
             palette_ram: PaletteRam { data: [0; 0x20] },
@@ -375,7 +385,7 @@ impl Ppu {
             }
             1 => {
                 if (cycle >= 9 && cycle <= 257) || (cycle >= 329 && cycle <= 337) {
-                    self.scanline_state.reload_shift_registers();
+                    self.scanline_state.reload_shift_registers(self.internal_registers.coarse_x(), self.internal_registers.coarse_y());
 
                     if cycle == 257 {
                         // Copy horizontal data from temporary vram address to vram address at dot 257
@@ -446,7 +456,6 @@ impl Ppu {
         let y = scanline as u32;
 
         // Get background pixel
-        // TODO - Handle masking left hand side
         let bg_pixel = match (
             self.ppu_mask.show_background,
             self.ppu_mask.show_background_left_side,
@@ -454,20 +463,15 @@ impl Ppu {
         ) {
             (false, _, _) => 0x0,
             (true, false, 0..=8) => 0x0,
-            _ => self.scanline_state.bg_pixel_palette(
-                self.internal_registers.fine_x_scroll,
-                self.internal_registers.coarse_x(),
-                self.internal_registers.coarse_y(),
-            ),
+            _ => self.scanline_state.bg_pixel_palette(self.internal_registers.fine_x_scroll),
         };
 
         // Get sprite pixel
-        // TODO - Handle masking left hand side for sprites
         let (sprite_pixel, sprite_priority_over_bg) =
             match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, cycle) {
                 (false, _, _) => (0x0, false),
                 (true, false, 0..=8) => (0x0, false),
-                _ => self.get_sprite_pixel(x, y, self.internal_registers.fine_x_scroll),
+                _ => self.get_sprite_pixel(),
             };
 
         // Pass the resulting values through a priority multiplexer to get the final pixel value
@@ -475,8 +479,8 @@ impl Ppu {
             (0, 0, _) => 0x0, // TODO - This is actually the default background color, not always 3F00
             (0, _, _) => sprite_pixel,
             (_, 0, _) => bg_pixel,
-            (_, _, false) => sprite_pixel,
-            (_, _, true) => bg_pixel,
+            (_, _, true) => sprite_pixel,
+            (_, _, false) => bg_pixel,
         };
 
         // Read the palette value for the current pixel
@@ -488,6 +492,10 @@ impl Ppu {
         self.frame_buffer[offset + 1] = ((color >> 8) & 0xFF) as u8; // Green channel
         self.frame_buffer[offset + 2] = (color >> 16) as u8; // Red channel
         self.frame_buffer[offset + 3] = 0x00; // Alpha channel
+
+        if sprite_pixel != 0 {
+            error!("{:}, {:} - {:08b}, {:08b}, {:04X} = {:08X}", self.scanline_state.scanline, self.scanline_state.scanline_cycle, bg_pixel, multiplexed_pixel, (0x3F00 | multiplexed_pixel as u16), color);
+        }
     }
 
     fn handle_prerender_scanline_cycle(&mut self, cycle: u16) {

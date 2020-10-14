@@ -539,7 +539,7 @@ impl Iterator for Ppu {
 
                         // Finally shift the registers one bit to get ready for the next dot
                         self.scanline_state.shift_bg_registers();
-                    } else if self.scanline_state.scanline_cycle >= 322 && self.scanline_state.scanline_cycle <= 337 {
+                    } else if self.scanline_state.scanline_cycle >= 322 && self.scanline_state.scanline_cycle <= 336 {
                         // Finally shift the registers one bit to get ready for the next dot
                         self.scanline_state.shift_bg_registers();
                     }

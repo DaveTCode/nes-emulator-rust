@@ -1,9 +1,9 @@
 use cartridge::mappers::ChrData;
+use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
-use cartridge::MirroringMode;
 use cartridge::PpuCartridgeAddressBus;
-use log::{debug, info};
+use log::{debug, error, info};
 
 #[derive(Debug, PartialEq)]
 enum PRGBankMode {
@@ -198,18 +198,18 @@ impl MMC1ChrChip {
                 chr_data: ChrData::Rom(rom),
                 chr_banks: if banks == 0 { 1 } else { banks },
                 ppu_vram: [0; 0x1000],
-                chr_bank: [0; 2],
-                chr_bank_offsets: [0; 2],
+                chr_bank: [0, 1],
+                chr_bank_offsets: [0, 0x1000],
                 load_register: LoadRegister::new(),
                 mirroring_mode: MirroringMode::OneScreenLowerBank,
-                chr_bank_mode: CHRBankMode::Switch8KB,
+                chr_bank_mode: CHRBankMode::Switch4KB,
             },
             None => MMC1ChrChip {
                 chr_data: ChrData::Ram([0; 0x2000]),
                 chr_banks: if banks == 0 { 1 } else { banks },
                 ppu_vram: [0; 0x1000],
-                chr_bank: [0; 2],
-                chr_bank_offsets: [0; 2],
+                chr_bank: [0, 1],
+                chr_bank_offsets: [0, 0x1000],
                 load_register: LoadRegister::new(),
                 mirroring_mode: MirroringMode::OneScreenLowerBank,
                 chr_bank_mode: CHRBankMode::Switch8KB,
@@ -248,12 +248,12 @@ impl MMC1ChrChip {
             CHRBankMode::Switch8KB => (value & 0b1_1110) % self.chr_banks,
         };
 
-        debug!(
-            "CHR banks updated to {:02X}, {:02X}",
-            self.chr_bank[0], self.chr_bank[1]
-        );
-
         self.update_bank_offsets();
+
+        debug!(
+            "CHR banks updated to {:02X}, {:02X}, offsets to {:04X}, {:04X} - Mode {:?} from value {:02X} on bank {:02X}",
+            self.chr_bank[0], self.chr_bank[1], self.chr_bank_offsets[0], self.chr_bank_offsets[1], self.chr_bank_mode, value, bank
+        );
     }
 
     fn update_bank_offsets(&mut self) {
@@ -273,18 +273,18 @@ impl MMC1ChrChip {
 impl PpuCartridgeAddressBus for MMC1ChrChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x0000..=0x1FFF => match &self.chr_data {
-                ChrData::Rom(rom) => {
-                    let adjusted_address = if address & 0x1000 == 0 {
-                        address + self.chr_bank_offsets[0]
-                    } else {
-                        address + self.chr_bank_offsets[1]
-                    };
+            0x0000..=0x1FFF => {
+                let adjusted_address = if address & 0x1000 == 0 {
+                    address + self.chr_bank_offsets[0]
+                } else {
+                    (address & 0xFFF) + self.chr_bank_offsets[1]
+                };
 
-                    rom[adjusted_address as usize]
+                match &self.chr_data {
+                    ChrData::Rom(rom) => rom[adjusted_address as usize],
+                    ChrData::Ram(ram) => ram[adjusted_address as usize],
                 }
-                ChrData::Ram(ram) => ram[address as usize],
-            },
+            }
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
                 debug!("Read {:04X} mirrored to {:04X}", address, mirrored_address);
@@ -299,10 +299,18 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
         info!("MMC1 CHR write {:04X}={:02X}", address, value);
         match address {
-            0x0000..=0x1FFF => match &mut self.chr_data {
-                ChrData::Rom(_) => (),
-                ChrData::Ram(ram) => ram[address as usize] = value,
-            },
+            0x0000..=0x1FFF => {
+                let adjusted_address = if address & 0x1000 == 0 {
+                    address + self.chr_bank_offsets[0]
+                } else {
+                    address + self.chr_bank_offsets[1]
+                };
+
+                match &mut self.chr_data {
+                    ChrData::Rom(_) => (),
+                    ChrData::Ram(ram) => ram[adjusted_address as usize] = value,
+                }
+            }
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
 
@@ -314,6 +322,10 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
     }
 
     fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: u32) {
+        debug!(
+            "CPU write to MMC1 CHR bus {:04X}={:02X} at {:} cycles",
+            address, value, cycles
+        );
         // Skip writes on consecutive cycles
         if cycles == self.load_register.last_write_cycle + 1 {
             return;

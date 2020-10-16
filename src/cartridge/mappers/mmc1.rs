@@ -299,18 +299,10 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
         info!("MMC1 CHR write {:04X}={:02X}", address, value);
         match address {
-            0x0000..=0x1FFF => {
-                let adjusted_address = if address & 0x1000 == 0 {
-                    address + self.chr_bank_offsets[0]
-                } else {
-                    address + self.chr_bank_offsets[1]
-                };
-
-                match &mut self.chr_data {
-                    ChrData::Rom(_) => (),
-                    ChrData::Ram(ram) => ram[adjusted_address as usize] = value,
-                }
-            }
+            0x0000..=0x1FFF => match &mut self.chr_data {
+                ChrData::Rom(_) => (),
+                ChrData::Ram(ram) => ram[address as usize] = value,
+            },
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
 

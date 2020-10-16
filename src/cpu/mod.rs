@@ -1008,7 +1008,7 @@ impl<'a> Cpu<'a> {
         &self.ppu.frame_buffer
     }
 
-    pub(super) fn dump_ppu_state(&self, vram_clone: &mut [u8; 0x4000]) -> (&[u8; 0x100], &[u8; 0x20]) {
+    pub(super) fn dump_ppu_state(&self, vram_clone: &mut [u8; 0x4000]) -> &[u8; 0x100] {
         self.ppu.dump_state(vram_clone)
     }
 }

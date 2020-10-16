@@ -190,12 +190,12 @@ impl Ppu {
         }
     }
 
-    pub(crate) fn dump_state(&self, vram_copy: &mut [u8; 0x4000]) -> (&[u8; 0x100], &[u8; 0x20]) {
+    pub(crate) fn dump_state(&self, vram_copy: &mut [u8; 0x4000]) -> &[u8; 0x100] {
         for i in 0..=0x3FFF {
             vram_copy[i] = self.read_byte(i as u16);
         }
 
-        (&self.sprite_data.oam_ram, &self.palette_ram.data)
+        &self.sprite_data.oam_ram
     }
 
     pub(crate) fn current_scanline(&self) -> u16 {

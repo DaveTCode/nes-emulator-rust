@@ -101,13 +101,16 @@ pub(crate) fn run(
                         Keycode::D => {
                             // Dump contents of PPU
                             let mut vram = [0; 0x4000];
-                            let (oam_ram, palette_ram) = cpu.dump_ppu_state(&mut vram);
+                            let oam_ram = cpu.dump_ppu_state(&mut vram);
                             let mut vram_file = File::create("vram.csv").unwrap();
                             let mut oam_ram_file = File::create("oam_ram.csv").unwrap();
-                            let mut palette_ram_file = File::create("palette_ram.csv").unwrap();
 
                             for b in vram.iter() {
                                 writeln!(vram_file, "{:02X}", b);
+                            }
+
+                            for b in oam_ram.iter() {
+                                writeln!(oam_ram_file, "{:02X}", b);
                             }
                         }
                         _ => (),

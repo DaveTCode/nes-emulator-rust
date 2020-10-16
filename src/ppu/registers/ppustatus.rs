@@ -1,4 +1,5 @@
 /// https://wiki.nesdev.com/w/index.php/PPU_registers#PPUSTATUS
+#[derive(Debug)]
 pub(crate) struct PpuStatus {
     pub(crate) sprite_overflow: bool,
     /// Set when a nonzero pixel of sprite 0 overlaps a nonzero background pixel; cleared at dot 1 of the line 261

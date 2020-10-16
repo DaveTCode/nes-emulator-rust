@@ -147,7 +147,7 @@ pub(crate) fn from_file(
 
     let prg_rom = bytes[16..prg_rom_end].to_vec();
     let chr_rom = match header.chr_rom_8kb_units {
-        0 => None, // There always has to be a bank of CHR ROM to read from, even if there's nothing there
+        0 => None,
         _ => Some(bytes[prg_rom_end..chr_rom_end].to_vec()),
     };
 

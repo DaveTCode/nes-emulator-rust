@@ -9,12 +9,11 @@ use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
 use ppu::registers::ppumask::PpuMask;
 use ppu::registers::ppustatus::PpuStatus;
 use ppu::sprites::SpriteData;
-use ppu::sprites::MAX_SPRITES;
-use ppu::sprites::MAX_SPRITES_PER_LINE;
 
 pub(crate) const SCREEN_WIDTH: u32 = 256;
 pub(crate) const SCREEN_HEIGHT: u32 = 240;
 
+#[derive(Debug)]
 struct ScanlineState {
     nametable_byte: u8,
     attribute_table_byte: u8,
@@ -54,7 +53,7 @@ impl ScanlineState {
         self.bg_shift_register_low |= self.bg_low_byte as u16;
 
         //at_bits = at_byte >> (((v >> 4) & 4) | ((v - 1) & 2));
-        let at_bits = self.attribute_table_byte >> (((coarse_y & 0b10) << 1) | (coarse_x  & 0b10)) & 0b11;
+        let at_bits = self.attribute_table_byte >> (((coarse_y & 0b10) << 1) | (coarse_x & 0b10)) & 0b11;
 
         self.at_shift_latch_low = at_bits & 1;
         self.at_shift_latch_high = (at_bits >> 1) & 1;
@@ -379,13 +378,12 @@ impl Ppu {
                         // Move to the next row of tiles at dot 256
                         self.internal_registers.incremement_effective_scroll_y();
                     }
-                } else {
-                    // TODO - Get sprite pattern table high byte
                 }
             }
             1 => {
                 if (cycle >= 9 && cycle <= 257) || (cycle >= 329 && cycle <= 337) {
-                    self.scanline_state.reload_shift_registers(self.internal_registers.coarse_x(), self.internal_registers.coarse_y());
+                    self.scanline_state
+                        .reload_shift_registers(self.internal_registers.coarse_x(), self.internal_registers.coarse_y());
 
                     if cycle == 257 {
                         // Copy horizontal data from temporary vram address to vram address at dot 257
@@ -424,15 +422,11 @@ impl Ppu {
                     self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
                         + tile_index
                         + self.internal_registers.fine_y() as u16;
-                } else {
-                    // TODO - Where does the sprite tile index come from here?
                 }
             }
             6 => {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.bg_low_byte = self.read_byte(self.internal_registers.next_address);
-                } else {
-                    // TODO - Where to store the sprite tile byte
                 }
             }
             7 => {
@@ -442,8 +436,6 @@ impl Ppu {
                         + tile_index
                         + self.internal_registers.fine_y() as u16
                         + 8;
-                } else {
-                    // TODO - Where does the sprite tile index come from here?
                 }
             }
             _ => panic!("Coding error, cycle {:}", cycle),
@@ -463,16 +455,22 @@ impl Ppu {
         ) {
             (false, _, _) => 0x0,
             (true, false, 0..=8) => 0x0,
-            _ => self.scanline_state.bg_pixel_palette(self.internal_registers.fine_x_scroll),
+            _ => self
+                .scanline_state
+                .bg_pixel_palette(self.internal_registers.fine_x_scroll),
         };
 
         // Get sprite pixel
-        let (sprite_pixel, sprite_priority_over_bg) =
+        let (sprite_pixel, sprite_priority_over_bg, is_sprite_zero) =
             match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, cycle) {
-                (false, _, _) => (0x0, false),
-                (true, false, 0..=8) => (0x0, false),
-                _ => self.get_sprite_pixel(),
+                (false, _, _) => (0x0, false, false),
+                (true, false, 0..=8) => (0x0, false, false),
+                _ => self.get_sprite_pixel(cycle),
             };
+
+        if is_sprite_zero && sprite_pixel != 0 && bg_pixel != 0 {
+            self.ppu_status.sprite_zero_hit = true;
+        }
 
         // Pass the resulting values through a priority multiplexer to get the final pixel value
         let multiplexed_pixel = match (bg_pixel, sprite_pixel, sprite_priority_over_bg) {
@@ -500,18 +498,16 @@ impl Ppu {
             self.ppu_status.sprite_zero_hit = false;
             self.frame_buffer.iter_mut().for_each(|m| *m = 0);
             self.priorities.iter_mut().for_each(|m| *m = 0);
-        } else if (cycle >= 280) && (cycle <= 304) {
-            if self.ppu_mask.is_rendering_enabled() {
-                // Repeatedly copy vertical bits from temp addr to real addr to reinitialise pre-render
-                self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr & 0b1111_1011_1110_0000)
-                    | (self.internal_registers.vram_addr & 0b0000_0100_0001_1111);
+        } else if (cycle >= 280) && (cycle <= 304) && self.ppu_mask.is_rendering_enabled() {
+            // Repeatedly copy vertical bits from temp addr to real addr to reinitialise pre-render
+            self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr & 0b1111_1011_1110_0000)
+                | (self.internal_registers.vram_addr & 0b0000_0100_0001_1111);
 
-                if cycle == 304 {
-                    debug!(
-                        "Starting frame t={:04X} v={:04X}",
-                        self.internal_registers.temp_vram_addr, self.internal_registers.vram_addr
-                    );
-                }
+            if cycle == 304 {
+                debug!(
+                    "Starting frame t={:04X} v={:04X}",
+                    self.internal_registers.temp_vram_addr, self.internal_registers.vram_addr
+                );
             }
         }
     }
@@ -528,7 +524,7 @@ impl Iterator for Ppu {
         }
 
         match self.scanline_state.scanline {
-            0..=239 => {
+            0..=239 | 261 => {
                 if self.ppu_mask.is_rendering_enabled() {
                     self.fetch_data(self.scanline_state.scanline_cycle);
                     self.process_sprite_cycle(
@@ -538,7 +534,10 @@ impl Iterator for Ppu {
                         self.ppu_ctrl.sprite_tile_table_select,
                     );
 
-                    if self.scanline_state.scanline_cycle >= 1 && self.scanline_state.scanline_cycle <= 256 {
+                    if self.scanline_state.scanline != 261
+                        && self.scanline_state.scanline_cycle >= 1
+                        && self.scanline_state.scanline_cycle <= 256
+                    {
                         self.draw_pixel(self.scanline_state.scanline, self.scanline_state.scanline_cycle);
 
                         // Finally shift the registers one bit to get ready for the next dot
@@ -548,9 +547,21 @@ impl Iterator for Ppu {
                         self.scanline_state.shift_bg_registers();
                     }
                 }
+
+                if self.scanline_state.scanline == 261 {
+                    self.handle_prerender_scanline_cycle(self.scanline_state.scanline_cycle);
+                }
+
+                // TODO - Technically we should also defer the nametable byte read
+                if self.scanline_state.scanline == 261
+                    && self.scanline_state.scanline_cycle == 339
+                    && self.is_short_frame
+                {
+                    trigger_cycle_skip = true;
+                }
             }
             240..=260 => {
-                // PPU in idle state during scanline 240 and during VBlank except for trigering NMI
+                // PPU in idle state during scanline 240 and during VBlank except for triggering NMI
                 if self.scanline_state.scanline_cycle == 1 && self.scanline_state.scanline == 241 {
                     self.ppu_status.vblank_started = true;
 
@@ -559,23 +570,6 @@ impl Iterator for Ppu {
                         self.trigger_nmi = true;
                         info!("Triggering NMI");
                     }
-                }
-            }
-            261 => {
-                if self.ppu_mask.is_rendering_enabled() {
-                    self.fetch_data(self.scanline_state.scanline_cycle);
-                    self.process_sprite_cycle(
-                        self.scanline_state.scanline,
-                        self.scanline_state.scanline_cycle,
-                        self.ppu_ctrl.sprite_size.pixels(),
-                        self.ppu_ctrl.sprite_tile_table_select,
-                    );
-                }
-                self.handle_prerender_scanline_cycle(self.scanline_state.scanline_cycle);
-
-                // TODO - Technically we should also defer the nametable byte read
-                if self.scanline_state.scanline_cycle == 339 && self.is_short_frame {
-                    trigger_cycle_skip = true;
                 }
             }
             _ => panic!("Invalid scanline {:}", self.scanline_state.scanline),
@@ -593,7 +587,7 @@ impl Iterator for Ppu {
 #[cfg(test)]
 mod ppu_tests {
     use super::Ppu;
-    use ppu::PpuCartridgeAddressBus;
+    use cartridge::PpuCartridgeAddressBus;
 
     struct FakeCartridge {}
 

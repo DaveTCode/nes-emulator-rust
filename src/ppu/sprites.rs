@@ -60,30 +60,40 @@ enum SpriteFetch {
     },
 }
 
+#[derive(Debug, Clone)]
+struct Sprite {
+    high_byte_shift_register: u8,
+    low_byte_shift_register: u8,
+    /// Holds the attribute byte for this sprite tile
+    attribute_latch: u8,
+    /// Counts down to when the sprite is made visible
+    x_location: u8,
+}
+
 pub(super) struct SpriteData {
     /// PPU register 0x2003
-    pub(super) oam_addr: u8,
+    oam_addr: u8,
     pub(super) oam_ram: [u8; MAX_SPRITES * 4],
-    pub(super) secondary_oam_ram: [u8; MAX_SPRITES_PER_LINE * 4],
-    pub(super) sprite_high_byte_shift_registers: [u8; 8],
-    pub(super) sprite_low_byte_shift_registers: [u8; 8],
-    pub(super) sprite_attribute_latches: [u8; 8],
-    pub(super) sprite_x_counters: [u8; 8],
+    secondary_oam_ram: [u8; MAX_SPRITES_PER_LINE * 4],
+    sprites: Vec<Sprite>,
     /// Internal representation of the pointer into secondary OAM RAM, reflects how many sprites have been copied
-    pub(super) secondary_oam_ram_pointer: usize,
+    secondary_oam_ram_pointer: usize,
     state: SpriteState,
 }
 
 impl SpriteData {
     pub(super) fn new() -> Self {
+        let default_sprite = Sprite {
+            high_byte_shift_register: 0,
+            low_byte_shift_register: 0,
+            attribute_latch: 0,
+            x_location: 0,
+        };
         SpriteData {
             oam_addr: 0,
             oam_ram: [0; MAX_SPRITES * 4],
             secondary_oam_ram: [0xFF; MAX_SPRITES_PER_LINE * 4],
-            sprite_high_byte_shift_registers: [0; 8],
-            sprite_low_byte_shift_registers: [0; 8],
-            sprite_attribute_latches: [0; 8],
-            sprite_x_counters: [0; 8],
+            sprites: vec![default_sprite; 8],
             secondary_oam_ram_pointer: 0,
             state: SpriteState::Waiting,
         }
@@ -114,30 +124,36 @@ impl SpriteData {
 }
 
 impl super::Ppu {
-    // TODO - I'm not doing anything with sprite zero hits here, not sure exactly the best time to sort that
-    pub(super) fn get_sprite_pixel(&mut self) -> (u8, bool) {
-        for i in 0..8 {
-            if self.sprite_data.sprite_x_counters[i] != 0 {
-                self.sprite_data.sprite_x_counters[i] -= 1;
-            }
+    /// Returns the index into palette RAM based upon the current state of the sprite
+    /// shift registers and latches
+    /// Note: Also shift the high/low byte shift registers
+    pub(super) fn get_sprite_pixel(&mut self, cycle: u16) -> (u8, bool, bool) {
+        // This isn't really correct, the x_location is actually a counter which counts down to 0 at which points it's visible
+        for (ix, sprite) in self
+            .sprite_data
+            .sprites
+            .iter_mut()
+            .filter(|s| (s.x_location as u16 >= cycle) && ((s.x_location as u16) < cycle + 8))
+            .enumerate()
+        {
+            let color_low_bit = sprite.low_byte_shift_register & 1;
+            let color_high_bit = sprite.high_byte_shift_register & 1;
+            let color_val = color_low_bit | (color_high_bit << 1);
+
+            // TODO - As noted by the spritecans test, this value can't be correct - it's expected to be 1 in that test
+            let palette_number = sprite.attribute_latch & 0b11;
+
+            sprite.high_byte_shift_register >>= 1;
+            sprite.low_byte_shift_register >>= 1;
+
+            return (
+                0b10100 | (palette_number << 2) | color_val,
+                sprite.attribute_latch & 0b0010_0000 == 0,
+                ix == 0,
+            );
         }
 
-        for i in 0..8 {
-            if self.sprite_data.sprite_x_counters[i] == 0 {
-                let sprite_pixel_val = ((self.sprite_data.sprite_high_byte_shift_registers[i] & 1) << 1)
-                    | (self.sprite_data.sprite_low_byte_shift_registers[i] & 1);
-
-                self.sprite_data.sprite_high_byte_shift_registers[i] >>= 1;
-                self.sprite_data.sprite_low_byte_shift_registers[i] >>= 1;
-
-                return (
-                    sprite_pixel_val,
-                    self.sprite_data.sprite_attribute_latches[i] & 0b0010_0000 == 0,
-                );
-            }
-        }
-
-        (0x0, false)
+        (0x0, false, false)
     }
 
     pub(super) fn process_sprite_cycle(
@@ -161,9 +177,18 @@ impl super::Ppu {
         match scanline {
             0..=239 | 261 => {
                 // if cycle == 320 {
-                //     error!("Scanline: {:}: Secondary OAM RAM: {:0X?}", scanline, self.sprite_data.secondary_oam_ram);
+                //     error!(
+                //         "Scanline: {:}: Secondary OAM RAM: {:0X?}",
+                //         scanline, self.sprite_data.secondary_oam_ram
+                //     );
                 // }
-                // error!("Scanline: {:}, Dot: {:}, OAMADDR: {:04X} {:?}", scanline, cycle, self.sprite_data.oam_addr, self.sprite_data.state);
+                // error!(
+                //     "Scanline: {:}, Dot: {:}, OAMADDR: {:04X} {:?}",
+                //     scanline, cycle, self.sprite_data.oam_addr, self.sprite_data.state
+                // );
+                // if cycle == 1 {
+                //     error!("scanline:{:}, {:?}", scanline, self.sprite_data.sprites);
+                // }
                 self.process_frame_cycle(scanline, cycle, sprite_height, pattern_table_base)
             }
             _ => (),
@@ -247,11 +272,14 @@ impl super::Ppu {
             }
             SpriteEvaluation::ReadByte { count } => {
                 debug_assert!(cycle >= 65 && cycle <= 256);
-                if self.sprite_data.oam_addr as usize <= self.sprite_data.oam_ram.len() {
+                if (self.sprite_data.oam_addr as usize) < self.sprite_data.oam_ram.len() {
                     let value = self.sprite_data.oam_ram[self.sprite_data.oam_addr as usize];
-                    self.sprite_data.oam_addr += 1;
 
-                    SpriteState::SpriteEvaluation(SpriteEvaluation::WriteByte { count, value })
+                    if self.sprite_data.oam_addr as usize == self.sprite_data.oam_ram.len() - 1 {
+                        SpriteState::Waiting
+                    } else {
+                        SpriteState::SpriteEvaluation(SpriteEvaluation::WriteByte { count, value })
+                    }
                 } else {
                     SpriteState::Waiting
                 }
@@ -260,8 +288,8 @@ impl super::Ppu {
                 debug_assert!(cycle >= 65 && cycle <= 256);
                 if self.sprite_data.secondary_oam_ram_pointer < self.sprite_data.secondary_oam_ram.len() {
                     self.sprite_data.secondary_oam_ram[self.sprite_data.secondary_oam_ram_pointer] = value;
+                    self.sprite_data.secondary_oam_ram_pointer += 1;
                 }
-                self.sprite_data.secondary_oam_ram_pointer += 1;
 
                 // TODO - Somewhere here we need to consider whether to set the sprite overflow flag
                 if count == 3 {
@@ -297,12 +325,12 @@ impl super::Ppu {
                 tile: self.sprite_data.secondary_oam_ram[sprite_index * 4 + 1],
             }),
             SpriteFetch::ReadAttr { sprite_index, y, tile } => {
-                self.sprite_data.sprite_attribute_latches[sprite_index] =
+                self.sprite_data.sprites[sprite_index].attribute_latch =
                     self.sprite_data.secondary_oam_ram[sprite_index * 4 + 2];
                 SpriteState::SpriteFetch(SpriteFetch::ReadX { sprite_index, y, tile })
             }
             SpriteFetch::ReadX { sprite_index, y, tile } => {
-                self.sprite_data.sprite_x_counters[sprite_index] =
+                self.sprite_data.sprites[sprite_index].x_location =
                     self.sprite_data.secondary_oam_ram[sprite_index * 4 + 3];
                 SpriteState::SpriteFetch(SpriteFetch::FetchHighByte { sprite_index, y, tile })
             }
@@ -310,7 +338,7 @@ impl super::Ppu {
                 let value = match get_sprite_address(
                     y as u16,
                     tile,
-                    self.sprite_data.sprite_attribute_latches[sprite_index],
+                    self.sprite_data.sprites[sprite_index].attribute_latch,
                     sprite_height,
                     scanline,
                     pattern_table_base,
@@ -332,14 +360,14 @@ impl super::Ppu {
                 tile,
                 value,
             } => {
-                self.sprite_data.sprite_high_byte_shift_registers[sprite_index] = value;
+                self.sprite_data.sprites[sprite_index].high_byte_shift_register = value;
                 SpriteState::SpriteFetch(SpriteFetch::FetchLowByte { sprite_index, y, tile })
             }
             SpriteFetch::FetchLowByte { sprite_index, y, tile } => {
                 let value = match get_sprite_address(
                     y as u16,
                     tile,
-                    self.sprite_data.sprite_attribute_latches[sprite_index],
+                    self.sprite_data.sprites[sprite_index].attribute_latch,
                     sprite_height,
                     scanline,
                     pattern_table_base,
@@ -351,7 +379,7 @@ impl super::Ppu {
                 SpriteState::SpriteFetch(SpriteFetch::WriteLowByte { sprite_index, value })
             }
             SpriteFetch::WriteLowByte { sprite_index, value } => {
-                self.sprite_data.sprite_low_byte_shift_registers[sprite_index] = value;
+                self.sprite_data.sprites[sprite_index].low_byte_shift_register = value;
 
                 if sprite_index == MAX_SPRITES_PER_LINE - 1 {
                     debug_assert!(cycle == 320);
@@ -417,7 +445,10 @@ mod sprite_tests {
     #[test]
     fn test_get_sprite_address_x8() {
         assert_eq!(get_sprite_address(200, 8, 0, 8, 202, 0x0), Some(0x0000 + (8 * 16) + 2));
-        assert_eq!(get_sprite_address(200, 8, 0, 8, 202, 0x1000), Some(0x1000 + (8 * 16) + 2));
+        assert_eq!(
+            get_sprite_address(200, 8, 0, 8, 202, 0x1000),
+            Some(0x1000 + (8 * 16) + 2)
+        );
         assert_eq!(
             get_sprite_address(200, 8, 0b1000_0000, 8, 202, 0x1000),
             Some(0x1000 + (8 * 16) + 5)
@@ -428,6 +459,9 @@ mod sprite_tests {
     fn test_get_sprite_address_x16() {
         assert_eq!(get_sprite_address(200, 8, 0, 16, 202, 0x0), Some(0x0000 + (8 * 16) + 2));
         // assert_eq!(get_sprite_address(200, 8, 0, 16, 209, 0x0), Some(0x0000 + (8 * 16) + 9)); - TODO - I think this seems right, so maybe my calculations above are wrong and large sprites won't currently work?
-        assert_eq!(get_sprite_address(200, 8, 0, 16, 202, 0x1000), Some(0x0000 + (8 * 16) + 2));
+        assert_eq!(
+            get_sprite_address(200, 8, 0, 16, 202, 0x1000),
+            Some(0x0000 + (8 * 16) + 2)
+        );
     }
 }

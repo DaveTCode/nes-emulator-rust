@@ -480,7 +480,7 @@ impl Ppu {
                 _ => self.get_sprite_pixel(cycle),
             };
 
-        if is_sprite_zero && sprite_pixel != 0 && bg_pixel != 0 {
+        if is_sprite_zero && (sprite_pixel & 0b11) != 0 && (bg_pixel & 0b11) != 0 {
             self.ppu_status.sprite_zero_hit = true;
         }
 

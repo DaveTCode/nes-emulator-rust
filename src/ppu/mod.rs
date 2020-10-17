@@ -52,8 +52,13 @@ impl ScanlineState {
         self.bg_shift_register_high |= self.bg_high_byte as u16;
         self.bg_shift_register_low |= self.bg_low_byte as u16;
 
-        //at_bits = at_byte >> (((v >> 4) & 4) | ((v - 1) & 2));
-        let at_bits = self.attribute_table_byte >> (((coarse_y & 0b10) << 1) | (coarse_x & 0b10)) & 0b11;
+        let at_bits = match (coarse_x & 0b10, coarse_y & 0b10) {
+            (0, 0) => self.attribute_table_byte & 0b11,
+            (2, 0) => (self.attribute_table_byte >> 2) & 0b11,
+            (0, 2) => (self.attribute_table_byte >> 4) & 0b11,
+            (2, 2) => (self.attribute_table_byte >> 6) & 0b11,
+            _ => panic!(),
+        };
 
         self.at_shift_latch_low = at_bits & 1;
         self.at_shift_latch_high = (at_bits >> 1) & 1;
@@ -76,6 +81,7 @@ impl ScanlineState {
     }
 }
 
+#[derive(Debug)]
 struct InternalRegisters {
     vram_addr: u16,
     temp_vram_addr: u16,
@@ -113,7 +119,7 @@ impl InternalRegisters {
     }
 
     /// Shamelessly taken from https://wiki.nesdev.com/w/index.php?title=PPU_scrolling&redirect=no#Wrapping_around
-    fn incremement_effective_scroll_y(&mut self) {
+    fn increment_effective_scroll_y(&mut self) {
         if self.fine_y() < 7 {
             self.vram_addr += 0x1000;
         } else {
@@ -297,7 +303,6 @@ impl Ppu {
             0x2004 => self.sprite_data.read_oam_data(),
             0x2005 => self.last_written_byte,
             0x2006 => self.last_written_byte,
-            // TODO - Buffer reads
             0x2007 => {
                 let mut value = self.ppu_data_buffer;
                 self.ppu_data_buffer = match self.internal_registers.vram_addr {
@@ -352,9 +357,12 @@ impl Ppu {
         }
     }
 
+    /// Handles the PPU fetch pipeline (ignoring sprites as those are handled by the SpriteData
+    /// state machine)
     fn fetch_data(&mut self, cycle: u16) {
         if cycle == 0 {
-            // On a short frame we skip the last dot of the pre-render line, so we need to load the nametable byte here instead
+            // On a short frame we skip the last dot of the pre-render line, so we need to load the
+            // nametable byte here instead.
             // Note that this is "not short frame" because that's already been reset by this point
             // Otherwise cycle 0 is always a blank cycle with no fetches
             if !self.is_short_frame && self.ppu_mask.is_rendering_enabled() {
@@ -376,14 +384,18 @@ impl Ppu {
                     // Once per frame increment y to the next row
                     if cycle == 256 {
                         // Move to the next row of tiles at dot 256
-                        self.internal_registers.incremement_effective_scroll_y();
+                        self.internal_registers.increment_effective_scroll_y();
                     }
                 }
             }
             1 => {
                 if (cycle >= 9 && cycle <= 257) || (cycle >= 329 && cycle <= 337) {
-                    self.scanline_state
-                        .reload_shift_registers(self.internal_registers.coarse_x(), self.internal_registers.coarse_y());
+                    // Note we've _just_ incremented X at the previous dot so we decrement here to
+                    // get the right value for the attribute calculation
+                    self.scanline_state.reload_shift_registers(
+                        self.internal_registers.coarse_x().wrapping_sub(1), // TODO - Why can X ever be zero here???
+                        self.internal_registers.coarse_y(),
+                    );
 
                     if cycle == 257 {
                         // Copy horizontal data from temporary vram address to vram address at dot 257
@@ -540,24 +552,21 @@ impl Iterator for Ppu {
                     {
                         self.draw_pixel(self.scanline_state.scanline, self.scanline_state.scanline_cycle);
 
-                        // Finally shift the registers one bit to get ready for the next dot
                         self.scanline_state.shift_bg_registers();
                     } else if self.scanline_state.scanline_cycle >= 322 && self.scanline_state.scanline_cycle <= 336 {
-                        // Finally shift the registers one bit to get ready for the next dot
                         self.scanline_state.shift_bg_registers();
+                    }
+
+                    if self.scanline_state.scanline == 261
+                        && self.scanline_state.scanline_cycle == 339
+                        && self.is_short_frame
+                    {
+                        trigger_cycle_skip = true;
                     }
                 }
 
                 if self.scanline_state.scanline == 261 {
                     self.handle_prerender_scanline_cycle(self.scanline_state.scanline_cycle);
-                }
-
-                // TODO - Technically we should also defer the nametable byte read
-                if self.scanline_state.scanline == 261
-                    && self.scanline_state.scanline_cycle == 339
-                    && self.is_short_frame
-                {
-                    trigger_cycle_skip = true;
                 }
             }
             240..=260 => {

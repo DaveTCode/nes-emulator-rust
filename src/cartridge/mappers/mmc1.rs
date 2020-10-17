@@ -232,7 +232,7 @@ impl MMC1ChrChip {
             _ => panic!(),
         };
 
-        debug!(
+        info!(
             "MMC1 Control register updated mirroring mode: {:?}, chr bank mode {:?}",
             self.mirroring_mode, self.chr_bank_mode
         );
@@ -250,7 +250,7 @@ impl MMC1ChrChip {
 
         self.update_bank_offsets();
 
-        debug!(
+        info!(
             "CHR banks updated to {:02X}, {:02X}, offsets to {:04X}, {:04X} - Mode {:?} from value {:02X} on bank {:02X}",
             self.chr_bank[0], self.chr_bank[1], self.chr_bank_offsets[0], self.chr_bank_offsets[1], self.chr_bank_mode, value, bank
         );
@@ -297,7 +297,7 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
     }
 
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
-        info!("MMC1 CHR write {:04X}={:02X}", address, value);
+        debug!("MMC1 CHR write {:04X}={:02X}", address, value);
         match address {
             0x0000..=0x1FFF => match &mut self.chr_data {
                 ChrData::Rom(_) => (),
@@ -364,7 +364,7 @@ pub(crate) fn from_header(
 ) {
     (
         Box::new(MMC1PrgChip::new(prg_rom, header.prg_rom_16kb_units)),
-        Box::new(MMC1ChrChip::new(chr_rom, header.chr_rom_8kb_units)),
+        Box::new(MMC1ChrChip::new(chr_rom, header.chr_rom_8kb_units * 2)),
         header,
     )
 }

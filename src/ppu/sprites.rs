@@ -68,6 +68,9 @@ struct Sprite {
     attribute_latch: u8,
     /// Counts down to when the sprite is made visible
     x_location: u8,
+    /// Not sure about this implementation, set on each sprite during fetch to
+    /// determine whether to ignore during sprite rendering.
+    visible: bool,
 }
 
 pub(super) struct SpriteData {
@@ -88,6 +91,7 @@ impl SpriteData {
             low_byte_shift_register: 0,
             attribute_latch: 0,
             x_location: 0,
+            visible: false,
         };
         SpriteData {
             oam_addr: 0,
@@ -133,7 +137,7 @@ impl super::Ppu {
             .sprite_data
             .sprites
             .iter_mut()
-            .filter(|s| (s.x_location as u16 >= cycle) && ((s.x_location as u16) < cycle + 8))
+            .filter(|s| (s.x_location as u16 >= cycle) && ((s.x_location as u16) < cycle + 8) && s.visible)
             .enumerate()
         {
             let color_low_bit = sprite.low_byte_shift_register & 1;
@@ -147,7 +151,7 @@ impl super::Ppu {
             sprite.low_byte_shift_register >>= 1;
 
             return (
-                0b10100 | (palette_number << 2) | color_val,
+                0b10000 | (palette_number << 2) | color_val,
                 sprite.attribute_latch & 0b0010_0000 == 0,
                 ix == 0,
             );
@@ -175,22 +179,7 @@ impl super::Ppu {
         }
 
         match scanline {
-            0..=239 | 261 => {
-                // if cycle == 320 {
-                //     error!(
-                //         "Scanline: {:}: Secondary OAM RAM: {:0X?}",
-                //         scanline, self.sprite_data.secondary_oam_ram
-                //     );
-                // }
-                // error!(
-                //     "Scanline: {:}, Dot: {:}, OAMADDR: {:04X} {:?}",
-                //     scanline, cycle, self.sprite_data.oam_addr, self.sprite_data.state
-                // );
-                // if cycle == 1 {
-                //     error!("scanline:{:}, {:?}", scanline, self.sprite_data.sprites);
-                // }
-                self.process_frame_cycle(scanline, cycle, sprite_height, pattern_table_base)
-            }
+            0..=239 | 261 => self.process_frame_cycle(scanline, cycle, sprite_height, pattern_table_base),
             _ => (),
         }
     }
@@ -335,16 +324,24 @@ impl super::Ppu {
                 SpriteState::SpriteFetch(SpriteFetch::FetchHighByte { sprite_index, y, tile })
             }
             SpriteFetch::FetchHighByte { sprite_index, y, tile } => {
-                let value = match get_sprite_address(
-                    y as u16,
-                    tile,
-                    self.sprite_data.sprites[sprite_index].attribute_latch,
-                    sprite_height,
-                    scanline,
-                    pattern_table_base,
-                ) {
-                    Some(address) => self.read_byte(address),
-                    None => 0x0,
+                let value = if scanline >= y as u16 && scanline <= y as u16 + sprite_height as u16 {
+                    self.sprite_data.sprites[sprite_index].visible = true;
+
+                    match get_sprite_address(
+                        y as u16,
+                        tile,
+                        self.sprite_data.sprites[sprite_index].attribute_latch,
+                        sprite_height,
+                        scanline,
+                        pattern_table_base,
+                    ) {
+                        Some(address) => self.read_byte(address),
+                        None => 0x0,
+                    }
+                } else {
+                    self.sprite_data.sprites[sprite_index].visible = false;
+
+                    0x0
                 };
 
                 SpriteState::SpriteFetch(SpriteFetch::WriteHighByte {

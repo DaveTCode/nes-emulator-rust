@@ -263,6 +263,7 @@ impl super::Ppu {
                 debug_assert!(cycle >= 65 && cycle <= 256);
                 if (self.sprite_data.oam_addr as usize) < self.sprite_data.oam_ram.len() {
                     let value = self.sprite_data.oam_ram[self.sprite_data.oam_addr as usize];
+                    self.sprite_data.oam_addr += 1;
 
                     if self.sprite_data.oam_addr as usize == self.sprite_data.oam_ram.len() - 1 {
                         SpriteState::Waiting

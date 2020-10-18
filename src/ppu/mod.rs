@@ -485,7 +485,7 @@ impl Ppu {
         }
 
         // Pass the resulting values through a priority multiplexer to get the final pixel value
-        let multiplexed_pixel = match (bg_pixel, sprite_pixel, sprite_priority_over_bg) {
+        let multiplexed_pixel = match (bg_pixel & 0b11, sprite_pixel & 0b11, sprite_priority_over_bg) {
             (0, 0, _) => 0x0, // TODO - This is actually the default background color, not always 3F00
             (0, _, _) => sprite_pixel,
             (_, 0, _) => bg_pixel,

@@ -61,11 +61,28 @@ enum SpriteFetch {
 }
 
 #[derive(Debug, Clone)]
+struct SpriteAttribute {
+    palette: u8,
+    priority: bool,
+    flipped_horizontal: bool,
+    flipped_vertical: bool,
+}
+
+impl SpriteAttribute {
+    fn set(&mut self, byte: u8) {
+        self.palette = byte & 0b11;
+        self.priority = byte & 0b0010_0000 == 0;
+        self.flipped_horizontal = byte & 0b0100_0000 == 0b0100_0000;
+        self.flipped_vertical = byte & 0b1000_0000 == 0b1000_0000;
+    }
+}
+
+#[derive(Debug, Clone)]
 struct Sprite {
     high_byte_shift_register: u8,
     low_byte_shift_register: u8,
     /// Holds the attribute byte for this sprite tile
-    attribute_latch: u8,
+    attribute_latch: SpriteAttribute,
     /// Counts down to when the sprite is made visible
     x_location: u8,
     /// Not sure about this implementation, set on each sprite during fetch to
@@ -89,7 +106,12 @@ impl SpriteData {
         let default_sprite = Sprite {
             high_byte_shift_register: 0,
             low_byte_shift_register: 0,
-            attribute_latch: 0,
+            attribute_latch: SpriteAttribute {
+                palette: 0,
+                priority: false,
+                flipped_horizontal: false,
+                flipped_vertical: false,
+            },
             x_location: 0,
             visible: false,
         };
@@ -137,22 +159,22 @@ impl super::Ppu {
             .sprite_data
             .sprites
             .iter_mut()
-            .filter(|s| (s.x_location as u16 >= cycle) && ((s.x_location as u16) < cycle + 8) && s.visible)
+            // TODO - Why on earth do I need to add 8 to x_location here to get it to appear in the right place??
+            .filter(|s| ((s.x_location as u16) + 8 >= cycle) && ((s.x_location as u16) + 8 < cycle + 8) && s.visible)
             .enumerate()
         {
             let color_low_bit = sprite.low_byte_shift_register & 1;
             let color_high_bit = sprite.high_byte_shift_register & 1;
             let color_val = color_low_bit | (color_high_bit << 1);
 
-            // TODO - As noted by the spritecans test, this value can't be correct - it's expected to be 1 in that test
-            let palette_number = sprite.attribute_latch & 0b11;
+            let palette_number = sprite.attribute_latch.palette;
 
             sprite.high_byte_shift_register >>= 1;
             sprite.low_byte_shift_register >>= 1;
 
             return (
                 0b10000 | (palette_number << 2) | color_val,
-                sprite.attribute_latch & 0b0010_0000 == 0,
+                sprite.attribute_latch.priority,
                 ix == 0,
             );
         }
@@ -239,7 +261,7 @@ impl super::Ppu {
                     self.sprite_data.secondary_oam_ram[self.sprite_data.secondary_oam_ram_pointer] = y;
                 }
 
-                if scanline >= y as u16 && scanline <= y as u16 + sprite_height as u16 {
+                if scanline >= y as u16 && scanline < y as u16 + sprite_height as u16 {
                     // Start moving this sprite into OAMRAM
                     self.sprite_data.secondary_oam_ram_pointer += 1;
 
@@ -315,8 +337,9 @@ impl super::Ppu {
                 tile: self.sprite_data.secondary_oam_ram[sprite_index * 4 + 1],
             }),
             SpriteFetch::ReadAttr { sprite_index, y, tile } => {
-                self.sprite_data.sprites[sprite_index].attribute_latch =
-                    self.sprite_data.secondary_oam_ram[sprite_index * 4 + 2];
+                self.sprite_data.sprites[sprite_index]
+                    .attribute_latch
+                    .set(self.sprite_data.secondary_oam_ram[sprite_index * 4 + 2]);
                 SpriteState::SpriteFetch(SpriteFetch::ReadX { sprite_index, y, tile })
             }
             SpriteFetch::ReadX { sprite_index, y, tile } => {
@@ -325,18 +348,18 @@ impl super::Ppu {
                 SpriteState::SpriteFetch(SpriteFetch::FetchHighByte { sprite_index, y, tile })
             }
             SpriteFetch::FetchHighByte { sprite_index, y, tile } => {
-                let value = if scanline >= y as u16 && scanline <= y as u16 + sprite_height as u16 {
+                let value = if scanline >= y as u16 && scanline < y as u16 + sprite_height as u16 {
                     self.sprite_data.sprites[sprite_index].visible = true;
 
                     match get_sprite_address(
                         y as u16,
                         tile,
-                        self.sprite_data.sprites[sprite_index].attribute_latch,
+                        &self.sprite_data.sprites[sprite_index].attribute_latch,
                         sprite_height,
                         scanline,
                         pattern_table_base,
                     ) {
-                        Some(address) => self.read_byte(address),
+                        Some(address) => self.read_byte(address.wrapping_add(8)),
                         None => 0x0,
                     }
                 } else {
@@ -362,17 +385,25 @@ impl super::Ppu {
                 SpriteState::SpriteFetch(SpriteFetch::FetchLowByte { sprite_index, y, tile })
             }
             SpriteFetch::FetchLowByte { sprite_index, y, tile } => {
-                let value = match get_sprite_address(
+                let mut value = match get_sprite_address(
                     y as u16,
                     tile,
-                    self.sprite_data.sprites[sprite_index].attribute_latch,
+                    &self.sprite_data.sprites[sprite_index].attribute_latch,
                     sprite_height,
                     scanline,
                     pattern_table_base,
                 ) {
-                    Some(address) => self.read_byte(address.wrapping_add(8)),
+                    Some(address) => self.read_byte(address),
                     None => 0x0,
                 };
+
+                // Handle horizontal flipping of bits at point of write rather than at point of read
+                if self.sprite_data.sprites[sprite_index]
+                    .attribute_latch
+                    .flipped_horizontal
+                {
+                    value = value.reverse_bits();
+                }
 
                 SpriteState::SpriteFetch(SpriteFetch::WriteLowByte { sprite_index, value })
             }
@@ -406,17 +437,17 @@ fn initialise_state_machine_for_scanline(scanline: u16) -> SpriteState {
 fn get_sprite_address(
     y: u16,
     tile: u8,
-    attr: u8,
+    attr: &SpriteAttribute,
     sprite_height: u8,
     scanline: u16,
     pattern_table_base: u16,
 ) -> Option<u16> {
-    if scanline < y || scanline - y > sprite_height as u16 {
+    if scanline < y || scanline - y >= sprite_height as u16 {
         return None;
     }
 
     let tile_fine_y = scanline - y;
-    let tile_fine_y_inc_flip = if attr & 0b1000_0000 == 0 {
+    let tile_fine_y_inc_flip = if attr.flipped_vertical {
         tile_fine_y
     } else {
         !tile_fine_y
@@ -439,26 +470,42 @@ fn get_sprite_address(
 #[cfg(test)]
 mod sprite_tests {
     use super::get_sprite_address;
+    use ppu::sprites::SpriteAttribute;
 
     #[test]
     fn test_get_sprite_address_x8() {
-        assert_eq!(get_sprite_address(200, 8, 0, 8, 202, 0x0), Some(0x0000 + (8 * 16) + 2));
+        let s = SpriteAttribute {
+            palette: 0,
+            priority: false,
+            flipped_vertical: false,
+            flipped_horizontal: false,
+        };
+        assert_eq!(get_sprite_address(200, 8, &s, 8, 202, 0x0), Some(0x0000 + (8 * 16) + 2));
         assert_eq!(
-            get_sprite_address(200, 8, 0, 8, 202, 0x1000),
+            get_sprite_address(200, 8, &s, 8, 202, 0x1000),
             Some(0x1000 + (8 * 16) + 2)
         );
         assert_eq!(
-            get_sprite_address(200, 8, 0b1000_0000, 8, 202, 0x1000),
+            get_sprite_address(200, 8, &s, 8, 202, 0x1000),
             Some(0x1000 + (8 * 16) + 5)
         );
     }
 
     #[test]
     fn test_get_sprite_address_x16() {
-        assert_eq!(get_sprite_address(200, 8, 0, 16, 202, 0x0), Some(0x0000 + (8 * 16) + 2));
+        let s = SpriteAttribute {
+            palette: 0,
+            priority: false,
+            flipped_vertical: false,
+            flipped_horizontal: false,
+        };
+        assert_eq!(
+            get_sprite_address(200, 8, &s, 16, 202, 0x0),
+            Some(0x0000 + (8 * 16) + 2)
+        );
         // assert_eq!(get_sprite_address(200, 8, 0, 16, 209, 0x0), Some(0x0000 + (8 * 16) + 9)); - TODO - I think this seems right, so maybe my calculations above are wrong and large sprites won't currently work?
         assert_eq!(
-            get_sprite_address(200, 8, 0, 16, 202, 0x1000),
+            get_sprite_address(200, 8, &s, 16, 202, 0x1000),
             Some(0x0000 + (8 * 16) + 2)
         );
     }

@@ -50,23 +50,15 @@ impl Opcode {
                 cpu.adc(operand.unwrap());
                 State::CpuState(CpuState::FetchOpcode)
             }
-            Operation::AHX => {
-                todo!();
-            }
-            Operation::ALR => {
-                todo!();
-            }
-            Operation::ANC => {
-                todo!();
-            }
+            Operation::AHX => todo!(),
+            Operation::ALR => todo!(),
+            Operation::ANC => todo!(),
             Operation::AND => {
                 cpu.registers.a &= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::CpuState(CpuState::FetchOpcode)
             }
-            Operation::ARR => {
-                todo!();
-            }
+            Operation::ARR => todo!(),
             Operation::ASL => {
                 let result = operand.unwrap() << 1;
                 cpu.registers
@@ -86,9 +78,7 @@ impl Opcode {
                     }),
                 }
             }
-            Operation::AXS => {
-                todo!();
-            }
+            Operation::AXS => todo!(),
             Operation::BCC
             | Operation::BCS
             | Operation::BEQ
@@ -223,9 +213,7 @@ impl Opcode {
                 error!("KIL opcode");
                 panic!();
             }
-            Operation::LAS => {
-                todo!();
-            }
+            Operation::LAS => todo!(),
             Operation::LAX => {
                 cpu.registers.a = operand.unwrap();
                 cpu.registers.x = operand.unwrap();
@@ -403,12 +391,8 @@ impl Opcode {
                     .insert(StatusFlags::INTERRUPT_DISABLE_FLAG);
                 State::CpuState(CpuState::FetchOpcode)
             }
-            Operation::SHX => {
-                todo!();
-            }
-            Operation::SHY => {
-                todo!();
-            }
+            Operation::SHX => todo!(),
+            Operation::SHY => todo!(),
             Operation::SLO => {
                 let result = operand.unwrap() << 1;
                 cpu.registers
@@ -452,9 +436,7 @@ impl Opcode {
                 address: address.unwrap(),
                 dummy: false,
             }),
-            Operation::TAS => {
-                todo!();
-            }
+            Operation::TAS => todo!(),
             Operation::TAX => {
                 cpu.registers.x = cpu.registers.a;
                 cpu.set_negative_zero_flags(cpu.registers.x);
@@ -484,9 +466,7 @@ impl Opcode {
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::CpuState(CpuState::FetchOpcode)
             }
-            Operation::XAA => {
-                todo!();
-            }
+            Operation::XAA => todo!(),
         }
     }
 }

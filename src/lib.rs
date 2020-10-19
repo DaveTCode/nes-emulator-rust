@@ -28,7 +28,7 @@ pub fn run(rom_file: String) {
         Ok(cartridge) => cartridge,
     };
 
-    info!("Catridge Loaded {:}", cartridge_header);
+    info!("Cartridge Loaded {:}", cartridge_header);
 
     sdl2_app::run(256, 240, prg_address_bus, chr_address_bus, cartridge_header);
 }

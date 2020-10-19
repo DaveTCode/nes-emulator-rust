@@ -1,3 +1,4 @@
+#[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone)]
 pub(super) enum Interrupt {
     NMI,

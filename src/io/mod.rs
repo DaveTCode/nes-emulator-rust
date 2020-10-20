@@ -60,11 +60,14 @@ impl Button {
         }
     }
 }
+
+#[derive(Debug)]
 struct ControllerState {
     all_data: u8,
     reading_button: Option<Button>,
 }
 
+#[derive(Debug)]
 pub(crate) struct Io {
     controller_1_state: ControllerState,
     controller_2_state: ControllerState,

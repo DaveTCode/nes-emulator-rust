@@ -461,9 +461,15 @@ fn get_sprite_address(
 
     let top_tile_byte = match sprite_height {
         8 => tile as u16 * 16 + pattern_table_base,
-        16 => (tile as u16) * 16 + ((tile as u16 & 1) * 0x1000),
+        16 => ((tile as u16) & 0b1111_1110) * 16 + ((tile as u16 & 1) * 0x1000),
         _ => panic!("Wrong sprite height {:}", sprite_height),
     };
+
+    error!(
+        "{:02X} = {:04X}",
+        tile,
+        top_tile_byte + fine_y + if is_high_byte { 8 } else { 0 }
+    );
 
     Some(top_tile_byte + fine_y + if is_high_byte { 8 } else { 0 })
 }
@@ -516,7 +522,7 @@ mod sprite_tests {
     #[test]
     fn test_get_sprite_address_x16() {
         for tile in 0..0xFF {
-            let tile_address = (tile as u16) * 16 + ((tile as u16 & 1) * 0x1000);
+            let tile_address = ((tile as u16) & 0b1111_1110) * 16 + ((tile as u16 & 1) * 0x1000);
 
             // Ignore pattern base for 16 pixel tiles
             assert_eq!(

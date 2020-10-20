@@ -465,12 +465,6 @@ fn get_sprite_address(
         _ => panic!("Wrong sprite height {:}", sprite_height),
     };
 
-    error!(
-        "{:02X} = {:04X}",
-        tile,
-        top_tile_byte + fine_y + if is_high_byte { 8 } else { 0 }
-    );
-
     Some(top_tile_byte + fine_y + if is_high_byte { 8 } else { 0 })
 }
 

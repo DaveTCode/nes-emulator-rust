@@ -539,12 +539,15 @@ impl Iterator for Ppu {
             0..=239 | 261 => {
                 if self.ppu_mask.is_rendering_enabled() {
                     self.fetch_data(self.scanline_state.scanline_cycle);
-                    self.process_sprite_cycle(
-                        self.scanline_state.scanline,
-                        self.scanline_state.scanline_cycle,
-                        self.ppu_ctrl.sprite_size.pixels(),
-                        self.ppu_ctrl.sprite_tile_table_select,
-                    );
+
+                    if self.scanline_state.scanline != 261 {
+                        self.process_sprite_cycle(
+                            self.scanline_state.scanline,
+                            self.scanline_state.scanline_cycle,
+                            self.ppu_ctrl.sprite_size.pixels(),
+                            self.ppu_ctrl.sprite_tile_table_select,
+                        );
+                    }
 
                     if self.scanline_state.scanline != 261
                         && self.scanline_state.scanline_cycle >= 1

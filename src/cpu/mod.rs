@@ -391,7 +391,7 @@ impl<'a> Cpu<'a> {
                             })
                         }
                         _ => {
-                            let value = Some(self.read_byte(correct_address));
+                            let value = Some(self.read_byte(first_read_address));
                             opcode.execute(self, value, Some(correct_address))
                         }
                     }

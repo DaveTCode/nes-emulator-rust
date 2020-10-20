@@ -45,6 +45,15 @@ impl Opcode {
     }
 
     pub(super) fn execute(&self, cpu: &mut Cpu, operand: Option<u8>, address: Option<u16>) -> State {
+        // All read modify write instructions do a double write, one on this cycle and
+        // one on the actual write cycle with the proper new value
+        if let (InstructionType::ReadModifyWrite, Some(o), Some(a)) =
+            (self.operation.instruction_type(), operand, address)
+        {
+            // Dummy write, first write the original value
+            cpu.write_byte(a, o);
+        };
+
         match self.operation {
             Operation::ADC => {
                 cpu.adc(operand.unwrap());
@@ -479,6 +488,7 @@ pub(super) enum InstructionType {
     Branch,
     Jump,
     Stack,
+    NoMemoryAccess,
 }
 
 #[derive(Debug)]
@@ -609,7 +619,9 @@ impl Operation {
     pub(super) fn instruction_type(&self) -> InstructionType {
         match self {
             Operation::JMP | Operation::JSR => InstructionType::Jump,
-            Operation::STA | Operation::STX | Operation::STY | Operation::SAX => InstructionType::Write,
+            Operation::STA | Operation::STX | Operation::STY | Operation::SAX | Operation::SHX | Operation::SHY => {
+                InstructionType::Write
+            }
             Operation::ASL
             | Operation::LSR
             | Operation::ROL
@@ -651,7 +663,24 @@ impl Operation {
             | Operation::PHP
             | Operation::PLA
             | Operation::PLP => InstructionType::Stack,
-            _ => panic!("Have not yet determined instruction type for {:?}", self),
+            Operation::CLC
+            | Operation::CLD
+            | Operation::CLI
+            | Operation::CLV
+            | Operation::DEX
+            | Operation::DEY
+            | Operation::INX
+            | Operation::INY
+            | Operation::SEC
+            | Operation::SED
+            | Operation::SEI
+            | Operation::TAX
+            | Operation::TAY
+            | Operation::TSX
+            | Operation::TXA
+            | Operation::TXS
+            | Operation::TYA => InstructionType::NoMemoryAccess,
+            _ => todo!("Not yet defined instruction type for {:?}", self),
         }
     }
 }

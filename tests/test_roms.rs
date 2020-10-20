@@ -28,6 +28,8 @@ macro_rules! rom_tests {
 
 rom_tests! {
     blargg_nes_cpu_test_official: (0x13399B3 * 3 as usize, 2605351162, Path::new(".").join("roms").join("test").join("blargg_nes_cpu_test5").join("official.nes")),
+    cpu_dummy_writes_oam: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_writes").join("cpu_dummy_writes_oam.nes")),
+    // cpu_dummy_writes_ppumem: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_writes").join("cpu_dummy_writes_ppumem.nes")), # Opcodes are fine but open bus behaviour is wrong apparently
     blargg_nes_ppu_test_palette_ram: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("palette_ram.nes")),
     blargg_nes_ppu_test_sprite_ram: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("sprite_ram.nes")),
     blargg_nes_ppu_test_vbl_clear_time: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("vbl_clear_time.nes")),

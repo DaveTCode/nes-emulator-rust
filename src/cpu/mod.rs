@@ -354,9 +354,7 @@ impl<'a> Cpu<'a> {
                     let value = Some(self.read_byte(correct_address));
                     opcode.execute(self, value, Some(correct_address))
                 } else {
-                    // Dummy read, whether or not we end up using it (may read from a memory mapped port)
                     let first_read_address = low_byte.wrapping_add(index) as u16 | ((high_byte as u16) << 8);
-                    let _ = self.read_byte(first_read_address);
 
                     match opcode.operation.instruction_type() {
                         InstructionType::Read => {
@@ -364,6 +362,8 @@ impl<'a> Cpu<'a> {
                                 let value = Some(self.read_byte(correct_address));
                                 opcode.execute(self, value, Some(correct_address))
                             } else {
+                                // Dummy read, we're going to go read from the right address next
+                                let _ = self.read_byte(first_read_address);
                                 State::CpuState(CpuState::ReadingOperand {
                                     opcode,
                                     address_low_byte,
@@ -376,6 +376,9 @@ impl<'a> Cpu<'a> {
                             }
                         }
                         InstructionType::ReadModifyWrite => {
+                            // Dummy read, we're going to go read from the right address next
+                            let _ = self.read_byte(first_read_address);
+
                             // Instructions which both read & write will always read twice
                             State::CpuState(CpuState::ReadingOperand {
                                 opcode,

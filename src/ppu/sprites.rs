@@ -38,25 +38,18 @@ enum SpriteFetch {
         y: u8,
         tile: u8,
     },
-    FetchHighByte {
+    FetchByte {
         sprite_index: usize,
         y: u8,
         tile: u8,
+        is_high_byte: bool,
     },
-    WriteHighByte {
+    WriteByte {
         sprite_index: usize,
         y: u8,
         tile: u8,
         value: u8,
-    },
-    FetchLowByte {
-        sprite_index: usize,
-        y: u8,
-        tile: u8,
-    },
-    WriteLowByte {
-        sprite_index: usize,
-        value: u8,
+        is_high_byte: bool,
     },
 }
 
@@ -154,32 +147,41 @@ impl super::Ppu {
     /// shift registers and latches
     /// Note: Also shift the high/low byte shift registers
     pub(super) fn get_sprite_pixel(&mut self, cycle: u16) -> (u8, bool, bool) {
-        // This isn't really correct, the x_location is actually a counter which counts down to 0 at which points it's visible
-        for (ix, sprite) in self
-            .sprite_data
-            .sprites
-            .iter_mut()
-            // TODO - Why on earth do I need to add 8 to x_location here to get it to appear in the right place??
-            .filter(|s| ((s.x_location as u16) + 8 >= cycle) && ((s.x_location as u16) + 8 < cycle + 8) && s.visible)
-            .enumerate()
-        {
-            let color_low_bit = sprite.low_byte_shift_register & 1;
-            let color_high_bit = sprite.high_byte_shift_register & 1;
-            let color_val = color_low_bit | (color_high_bit << 1);
+        let mut found_pixel = false;
+        let mut result = (0x0u8, false, false);
 
-            let palette_number = sprite.attribute_latch.palette;
+        for sprite_index in 0..MAX_SPRITES_PER_LINE {
+            // Skip sprites which aren't yet visible on this line
+            if !self.sprite_data.sprites[sprite_index].visible
+                || (self.sprite_data.sprites[sprite_index].x_location as u16 + 8) < cycle
+                || (self.sprite_data.sprites[sprite_index].x_location as u16) >= cycle
+            {
+                continue;
+            }
 
-            sprite.high_byte_shift_register >>= 1;
-            sprite.low_byte_shift_register >>= 1;
+            if !found_pixel {
+                let color_low_bit = (self.sprite_data.sprites[sprite_index].low_byte_shift_register & 0b1000_0000) >> 7;
+                let color_high_bit =
+                    (self.sprite_data.sprites[sprite_index].high_byte_shift_register & 0b1000_0000) >> 7;
+                let color_val = color_low_bit | (color_high_bit << 1);
 
-            return (
-                0b10000 | (palette_number << 2) | color_val,
-                sprite.attribute_latch.priority,
-                ix == 0,
-            );
+                let palette_number = self.sprite_data.sprites[sprite_index].attribute_latch.palette;
+
+                result = (
+                    0b10000 | (palette_number << 2) | color_val,
+                    self.sprite_data.sprites[sprite_index].attribute_latch.priority,
+                    sprite_index == 0,
+                );
+
+                found_pixel = true;
+            }
+
+            // Shift the registers
+            self.sprite_data.sprites[sprite_index].high_byte_shift_register <<= 1;
+            self.sprite_data.sprites[sprite_index].low_byte_shift_register <<= 1;
         }
 
-        (0x0, false, false)
+        result
     }
 
     pub(super) fn process_sprite_cycle(
@@ -345,56 +347,38 @@ impl super::Ppu {
             SpriteFetch::ReadX { sprite_index, y, tile } => {
                 self.sprite_data.sprites[sprite_index].x_location =
                     self.sprite_data.secondary_oam_ram[sprite_index * 4 + 3];
-                SpriteState::SpriteFetch(SpriteFetch::FetchHighByte { sprite_index, y, tile })
+                SpriteState::SpriteFetch(SpriteFetch::FetchByte {
+                    sprite_index,
+                    y,
+                    tile,
+                    is_high_byte: false,
+                })
             }
-            SpriteFetch::FetchHighByte { sprite_index, y, tile } => {
-                let value = if scanline >= y as u16 && scanline < y as u16 + sprite_height as u16 {
+            SpriteFetch::FetchByte {
+                sprite_index,
+                y,
+                tile,
+                is_high_byte,
+            } => {
+                let mut value = if scanline >= y as u16 && scanline < y as u16 + sprite_height as u16 {
                     self.sprite_data.sprites[sprite_index].visible = true;
 
                     match get_sprite_address(
                         y as u16,
                         tile,
-                        &self.sprite_data.sprites[sprite_index].attribute_latch,
+                        self.sprite_data.sprites[sprite_index].attribute_latch.flipped_vertical,
                         sprite_height,
                         scanline,
                         pattern_table_base,
+                        is_high_byte,
                     ) {
-                        Some(address) => self.read_byte(address.wrapping_add(8)),
+                        Some(address) => self.read_byte(address),
                         None => 0x0,
                     }
                 } else {
                     self.sprite_data.sprites[sprite_index].visible = false;
 
                     0x0
-                };
-
-                SpriteState::SpriteFetch(SpriteFetch::WriteHighByte {
-                    sprite_index,
-                    y,
-                    tile,
-                    value,
-                })
-            }
-            SpriteFetch::WriteHighByte {
-                sprite_index,
-                y,
-                tile,
-                value,
-            } => {
-                self.sprite_data.sprites[sprite_index].high_byte_shift_register = value;
-                SpriteState::SpriteFetch(SpriteFetch::FetchLowByte { sprite_index, y, tile })
-            }
-            SpriteFetch::FetchLowByte { sprite_index, y, tile } => {
-                let mut value = match get_sprite_address(
-                    y as u16,
-                    tile,
-                    &self.sprite_data.sprites[sprite_index].attribute_latch,
-                    sprite_height,
-                    scanline,
-                    pattern_table_base,
-                ) {
-                    Some(address) => self.read_byte(address),
-                    None => 0x0,
                 };
 
                 // Handle horizontal flipping of bits at point of write rather than at point of read
@@ -405,18 +389,37 @@ impl super::Ppu {
                     value = value.reverse_bits();
                 }
 
-                SpriteState::SpriteFetch(SpriteFetch::WriteLowByte { sprite_index, value })
+                SpriteState::SpriteFetch(SpriteFetch::WriteByte {
+                    sprite_index,
+                    y,
+                    tile,
+                    value,
+                    is_high_byte,
+                })
             }
-            SpriteFetch::WriteLowByte { sprite_index, value } => {
-                self.sprite_data.sprites[sprite_index].low_byte_shift_register = value;
+            SpriteFetch::WriteByte {
+                sprite_index,
+                y,
+                tile,
+                value,
+                is_high_byte,
+            } => {
+                match is_high_byte {
+                    true => self.sprite_data.sprites[sprite_index].high_byte_shift_register = value,
+                    false => self.sprite_data.sprites[sprite_index].low_byte_shift_register = value,
+                };
 
-                if sprite_index == MAX_SPRITES_PER_LINE - 1 {
-                    debug_assert!(cycle == 320);
-                    SpriteState::Waiting
-                } else {
-                    SpriteState::SpriteFetch(SpriteFetch::ReadY {
+                match (sprite_index, is_high_byte) {
+                    (7, _) => SpriteState::Waiting,
+                    (_, false) => SpriteState::SpriteFetch(SpriteFetch::FetchByte {
+                        sprite_index,
+                        y,
+                        tile,
+                        is_high_byte: true,
+                    }),
+                    (_, true) => SpriteState::SpriteFetch(SpriteFetch::ReadY {
                         sprite_index: sprite_index + 1,
-                    })
+                    }),
                 }
             }
         }
@@ -437,76 +440,132 @@ fn initialise_state_machine_for_scanline(scanline: u16) -> SpriteState {
 fn get_sprite_address(
     y: u16,
     tile: u8,
-    attr: &SpriteAttribute,
+    flipped_vertical: bool,
     sprite_height: u8,
     scanline: u16,
     pattern_table_base: u16,
+    is_high_byte: bool,
 ) -> Option<u16> {
     if scanline < y || scanline - y >= sprite_height as u16 {
         return None;
     }
 
-    let tile_fine_y = scanline - y;
-    let tile_fine_y_inc_flip = if attr.flipped_vertical {
-        tile_fine_y
-    } else {
-        !tile_fine_y
+    let mut fine_y = match flipped_vertical {
+        true => (sprite_height as u16 - 1) - (scanline - y),
+        false => scanline - y,
     };
 
-    match sprite_height {
-        8 => Some(pattern_table_base + (16 * tile as u16) + (tile_fine_y_inc_flip & 7)),
-        16 => {
-            let base = tile as u16 & 1 * 0x1000;
-            Some(
-                base + (16 * (tile as u16 & 0b1111_1110))
-                    + ((tile_fine_y_inc_flip & 8) << 1)
-                    + (tile_fine_y_inc_flip & 7),
-            )
-        }
-        _ => panic!("Wrong sprite height {:}", sprite_height),
+    if (scanline - y) > 7 {
+        fine_y += 8;
     }
+
+    let top_tile_byte = match sprite_height {
+        8 => tile as u16 * 16 + pattern_table_base,
+        16 => (tile as u16) * 16 + ((tile as u16 & 1) * 0x1000),
+        _ => panic!("Wrong sprite height {:}", sprite_height),
+    };
+
+    Some(top_tile_byte + fine_y + if is_high_byte { 8 } else { 0 })
 }
 
 #[cfg(test)]
 mod sprite_tests {
     use super::get_sprite_address;
-    use ppu::sprites::SpriteAttribute;
 
     #[test]
     fn test_get_sprite_address_x8() {
-        let s = SpriteAttribute {
-            palette: 0,
-            priority: false,
-            flipped_vertical: false,
-            flipped_horizontal: false,
-        };
-        assert_eq!(get_sprite_address(200, 8, &s, 8, 202, 0x0), Some(0x0000 + (8 * 16) + 2));
-        assert_eq!(
-            get_sprite_address(200, 8, &s, 8, 202, 0x1000),
-            Some(0x1000 + (8 * 16) + 2)
-        );
-        assert_eq!(
-            get_sprite_address(200, 8, &s, 8, 202, 0x1000),
-            Some(0x1000 + (8 * 16) + 5)
-        );
+        for tile in 0..0xFF {
+            let tile_address = tile as u16 * 16;
+
+            // No pattern base for 8*8 pixel tiles
+            assert_eq!(
+                get_sprite_address(200, tile, false, 8, 200, 0x0000, false),
+                Some(tile_address),
+                "Tile {:02X} has the wrong address in 8 pixel mode",
+                tile
+            );
+
+            // Correct pattern base for 8*8 pixel tiles
+            assert_eq!(
+                get_sprite_address(200, tile, false, 8, 200, 0x1000, false),
+                Some(tile_address + 0x1000),
+                "Tile {:02X} has the wrong address in 8 pixel mode with pattern base 0x1000",
+                tile
+            );
+
+            for fine_y in 0..8 {
+                assert_eq!(
+                    get_sprite_address(200, tile, false, 8, 200 + fine_y, 0x0000, false),
+                    Some(tile_address + fine_y),
+                    "Tile {:02X} on line {:} has the wrong address in 8 pixel mode",
+                    tile,
+                    200 + fine_y
+                );
+
+                assert_eq!(
+                    get_sprite_address(200, tile, true, 8, 200 + fine_y, 0x0000, false),
+                    Some(tile_address + (7 - fine_y)),
+                    "Tile {:02X} on line {:} has the wrong address in 8 pixel mode flipped vertically",
+                    tile,
+                    200 + fine_y
+                );
+            }
+        }
     }
 
     #[test]
     fn test_get_sprite_address_x16() {
-        let s = SpriteAttribute {
-            palette: 0,
-            priority: false,
-            flipped_vertical: false,
-            flipped_horizontal: false,
-        };
-        assert_eq!(
-            get_sprite_address(200, 8, &s, 16, 202, 0x0),
-            Some(0x0000 + (8 * 16) + 2)
-        );
-        // assert_eq!(get_sprite_address(200, 8, 0, 16, 209, 0x0), Some(0x0000 + (8 * 16) + 9)); - TODO - I think this seems right, so maybe my calculations above are wrong and large sprites won't currently work?
-        assert_eq!(
-            get_sprite_address(200, 8, &s, 16, 202, 0x1000),
-            Some(0x0000 + (8 * 16) + 2)
-        );
+        for tile in 0..0xFF {
+            let tile_address = (tile as u16) * 16 + ((tile as u16 & 1) * 0x1000);
+
+            // Ignore pattern base for 16 pixel tiles
+            assert_eq!(
+                get_sprite_address(200, tile, false, 16, 200, 0x1000, false),
+                Some(tile_address),
+                "Tile {:02X} has the wrong address in 16 pixel mode when mucking with the pattern base",
+                tile
+            );
+
+            for fine_y in 0..16 {
+                let not_flipped_fine_y = fine_y + if fine_y > 7 { 8 } else { 0 };
+                let flipped_fine_y = (15 - fine_y) + if fine_y > 7 { 8 } else { 0 };
+
+                // Check that the low byte of the tile has the right byte
+                assert_eq!(
+                    get_sprite_address(200, tile, false, 16, 200 + fine_y, 0x0, false),
+                    Some(tile_address + not_flipped_fine_y),
+                    "Tile {:02X} at scanline {:} low byte has the wrong address in 16 pixel mode",
+                    tile,
+                    200 + fine_y
+                );
+
+                // Check that the high byte of the tile has the right byte
+                assert_eq!(
+                    get_sprite_address(200, tile, false, 16, 200 + fine_y, 0x0, true),
+                    Some(tile_address + not_flipped_fine_y + 8),
+                    "Tile {:02X} at scanline {:} high byte has the wrong address in 16 pixel mode",
+                    tile,
+                    200 + fine_y
+                );
+
+                // Check that the low byte of the tile has the right byte for non-zero fine y if flipped vertically
+                assert_eq!(
+                    get_sprite_address(200, tile, true, 16, 200 + fine_y, 0x0, false),
+                    Some(tile_address + flipped_fine_y),
+                    "Tile {:02X} at scanline {:} low byte has the wrong address in 16 pixel mode when flipped",
+                    tile,
+                    200 + fine_y
+                );
+
+                // Check that the low byte of the tile has the right byte for non-zero fine y if flipped vertically
+                assert_eq!(
+                    get_sprite_address(200, tile, true, 16, 200 + fine_y, 0x0, true),
+                    Some(tile_address + flipped_fine_y + 8),
+                    "Tile {:02X} at scanline {:} high byte has the wrong address in 16 pixel mode when flipped",
+                    tile,
+                    200 + fine_y
+                );
+            }
+        }
     }
 }

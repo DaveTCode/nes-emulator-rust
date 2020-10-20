@@ -30,3 +30,7 @@ loggers:
     level: error
     appenders:
       - file
+  rust_nes::io:
+    level: error
+    appenders:
+      - file

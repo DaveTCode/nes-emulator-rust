@@ -45,7 +45,16 @@ rom_tests! {
     cpu_timing_test: (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("cpu_timing_test6").join("cpu_timing_test.nes")),
     oam_read: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("oam_read").join("oam_read.nes")),
     cpu_exec_space_ppuio: (0x2367FD * 3 as usize, 2453696551, Path::new(".").join("roms").join("test").join("cpu_exec_space").join("test_cpu_exec_space_ppuio.nes")),
-    // sprite_zero_hit: (0x2367FD * 3 as usize, 2453696551, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("ppu_sprite_hit.nes")), #
+    sprite_zero_hit_01_basics: (0x1DF406 * 3 as usize, 2445173019, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("01-basics.nes")),
+    sprite_zero_hit_02_alignment: (0x1DF406 * 3 as usize, 901509059, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("02-alignment.nes")),
+    sprite_zero_hit_03_corners: (0x1DF406 * 3 as usize, 218094906, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("03-corners.nes")),
+    sprite_zero_hit_04_flip: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("04-flip.nes")),
+    //sprite_zero_hit_05_left_clip: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("05-left_clip.nes")),
+    sprite_zero_hit_06_right_edge: (0x1DF406 * 3 as usize, 2932966414, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("06-right_edge.nes")),
+    //sprite_zero_hit_07_screen_bottom: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("07-screen_bottom.nes")),
+    sprite_zero_hit_08_double_height: (0x1DF406 * 3 as usize, 3281055842, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("08-double_height.nes")),
+    //sprite_zero_hit_09_timing: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("09-timing.nes")),
+    //sprite_zero_hit_10_timing_order: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("10-timing_order.nes")),
 }
 
 const ASCII_GRAYSCALE_ARRAY: [char; 96] = [

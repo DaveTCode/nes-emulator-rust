@@ -463,10 +463,10 @@ impl Ppu {
         let bg_pixel = match (
             self.ppu_mask.show_background,
             self.ppu_mask.show_background_left_side,
-            cycle,
+            x,
         ) {
             (false, _, _) => 0x0,
-            (true, false, 0..=8) => 0x0,
+            (true, false, 0..=7) => 0x0,
             _ => self
                 .scanline_state
                 .bg_pixel_palette(self.internal_registers.fine_x_scroll),
@@ -474,9 +474,9 @@ impl Ppu {
 
         // Get sprite pixel
         let (sprite_pixel, sprite_priority_over_bg, is_sprite_zero) =
-            match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, cycle) {
+            match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, x) {
                 (false, _, _) => (0x0, false, false),
-                (true, false, 0..=8) => (0x0, false, false),
+                (true, false, 0..=7) => (0x0, false, false),
                 _ => self.get_sprite_pixel(cycle),
             };
 

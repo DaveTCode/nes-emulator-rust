@@ -663,18 +663,24 @@ impl<'a> Cpu<'a> {
                             (Some(_), Some(low_byte), Some(high_byte)) => {
                                 // Cycle 5(/6) - Read the operand and execute the operation checking for crossing page boundary
                                 let unindexed_address = (low_byte as u16) | ((high_byte as u16) << 8);
+                                let dummy_read_address =
+                                    low_byte.wrapping_add(self.registers.y) as u16 | ((high_byte as u16) << 8);
                                 let address = unindexed_address.wrapping_add(self.registers.y as u16);
 
                                 match opcode.operation.instruction_type() {
                                     InstructionType::Write => {
-                                        let value = Some(self.read_byte(address));
-                                        opcode.execute(self, value, Some(address))
+                                        // Dummy read of address without fixing the high byte (so without wrap)
+                                        let _ = Some(self.read_byte(dummy_read_address));
+                                        opcode.execute(self, None, Some(address))
                                     }
                                     _ => {
                                         if checked_page_boundary || (unindexed_address >> 4) == (address >> 4) {
                                             let value = Some(self.read_byte(address));
                                             opcode.execute(self, value, Some(address))
                                         } else {
+                                            // Dummy read of address without fixing the high byte (so without wrap)
+                                            let _ = Some(self.read_byte(dummy_read_address));
+
                                             State::CpuState(CpuState::ReadingOperand {
                                                 opcode,
                                                 address_low_byte: Some(low_byte),
@@ -817,9 +823,9 @@ impl<'a> Cpu<'a> {
                             match opcode.operation.instruction_type() {
                                 InstructionType::Write => {
                                     let address = low_byte.wrapping_add(self.registers.y) as u16;
-                                    let value = Some(self.read_byte(address));
+                                    let _ = Some(self.read_byte(address));
 
-                                    opcode.execute(self, value, Some(address))
+                                    opcode.execute(self, None, Some(address))
                                 }
                                 _ => State::CpuState(CpuState::ReadingOperand {
                                     opcode,

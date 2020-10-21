@@ -106,6 +106,10 @@ enum CpuState {
     },
 }
 
+fn check_page_cross(address_1: u16, address_2: u16) -> bool {
+    address_1.wrapping_add(address_2) & 0xFF00 != (address_1 & 0xFF00)
+}
+
 pub struct Cpu<'a> {
     state: State,
     registers: Registers,
@@ -148,6 +152,8 @@ impl<'a> Cpu<'a> {
     }
 
     fn read_byte(&mut self, address: u16) -> u8 {
+        debug!("CPU address space read {:04X}", address);
+
         match address {
             0x0000..=0x07FF => self.ram[address as usize],
             0x0800..=0x1FFF => self.ram[(address % 0x0800) as usize], // Mirrors of ram space
@@ -674,7 +680,7 @@ impl<'a> Cpu<'a> {
                                         opcode.execute(self, None, Some(address))
                                     }
                                     _ => {
-                                        if checked_page_boundary || (unindexed_address >> 4) == (address >> 4) {
+                                        if checked_page_boundary || (dummy_read_address == address) {
                                             let value = Some(self.read_byte(address));
                                             opcode.execute(self, value, Some(address))
                                         } else {

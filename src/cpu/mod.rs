@@ -605,8 +605,7 @@ impl<'a> Cpu<'a> {
                                 match opcode.operation.instruction_type() {
                                     InstructionType::Write => {
                                         let address = (address_low_byte as u16) | ((address_high_byte as u16) << 8);
-                                        let value = Some(self.read_byte(address));
-                                        opcode.execute(self, value, Some(address))
+                                        opcode.execute(self, None, Some(address))
                                     }
                                     _ => State::CpuState(CpuState::ReadingOperand {
                                         opcode,

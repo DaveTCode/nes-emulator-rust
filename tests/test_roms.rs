@@ -30,8 +30,8 @@ rom_tests! {
     // ----- General CPU Tests -----
     blargg_nes_cpu_test_official: (0x13399B3 * 3 as usize, 2605351162, Path::new(".").join("roms").join("test").join("blargg_nes_cpu_test5").join("official.nes")),
     cpu_timing_test: (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("cpu_timing_test6").join("cpu_timing_test.nes")),
-    // instr_misc:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_misc").join("instr_misc.nes")), - Failing due to double read error
-    // cpu_dummy_reads: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_reads").join("cpu_dummy_reads.nes")), - Requires MMC3 support
+    // instr_misc:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_misc").join("instr_misc.nes")), - Failing due to unimplemented APU length counter (singles up to that pass)
+    cpu_dummy_reads: (0x18F464 * 3 as usize, 2170164011, Path::new(".").join("roms").join("test").join("cpu_dummy_reads").join("cpu_dummy_reads.nes")),
     cpu_dummy_writes_oam: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_writes").join("cpu_dummy_writes_oam.nes")),
     // cpu_dummy_writes_ppumem: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_writes").join("cpu_dummy_writes_ppumem.nes")), # Opcodes are fine but open bus behaviour is wrong apparently
     cpu_exec_space_ppuio: (0x2367FD * 3 as usize, 2453696551, Path::new(".").join("roms").join("test").join("cpu_exec_space").join("test_cpu_exec_space_ppuio.nes")),

@@ -458,46 +458,53 @@ impl Ppu {
     fn draw_pixel(&mut self, scanline: u16, cycle: u16) {
         let x = cycle as u32 - 1;
         let y = scanline as u32;
+        let offset = ((SCREEN_WIDTH * y + x) * 4) as usize;
 
-        // Get background pixel
-        let bg_pixel = match (
-            self.ppu_mask.show_background,
-            self.ppu_mask.show_background_left_side,
-            x,
-        ) {
-            (false, _, _) => 0x0,
-            (true, false, 0..=7) => 0x0,
-            _ => self
-                .scanline_state
-                .bg_pixel_palette(self.internal_registers.fine_x_scroll),
-        };
-
-        // Get sprite pixel
-        let (sprite_pixel, sprite_priority_over_bg, is_sprite_zero) =
-            match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, x) {
-                (false, _, _) => (0x0, false, false),
-                (true, false, 0..=7) => (0x0, false, false),
-                _ => self.get_sprite_pixel(cycle),
+        let color = if self.ppu_mask.is_rendering_enabled() {
+            // Get background pixel
+            let bg_pixel = match (
+                self.ppu_mask.show_background,
+                self.ppu_mask.show_background_left_side,
+                x,
+            ) {
+                (false, _, _) => 0x0,
+                (true, false, 0..=7) => 0x0,
+                _ => self
+                    .scanline_state
+                    .bg_pixel_palette(self.internal_registers.fine_x_scroll),
             };
 
-        if is_sprite_zero && (sprite_pixel & 0b11) != 0 && (bg_pixel & 0b11) != 0 && x != 0xFF {
-            self.ppu_status.sprite_zero_hit = true;
-        }
+            // Get sprite pixel
+            let (sprite_pixel, sprite_priority_over_bg, is_sprite_zero) =
+                match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, x) {
+                    (false, _, _) => (0x0, false, false),
+                    (true, false, 0..=7) => (0x0, false, false),
+                    _ => self.get_sprite_pixel(cycle),
+                };
 
-        // Pass the resulting values through a priority multiplexer to get the final pixel value
-        let multiplexed_pixel = match (bg_pixel & 0b11, sprite_pixel & 0b11, sprite_priority_over_bg) {
-            (0, 0, _) => 0x0, // TODO - This is actually the default background color, not always 3F00
-            (0, _, _) => sprite_pixel,
-            (_, 0, _) => bg_pixel,
-            (_, _, true) => sprite_pixel,
-            (_, _, false) => bg_pixel,
+            if is_sprite_zero && (sprite_pixel & 0b11) != 0 && (bg_pixel & 0b11) != 0 && x != 0xFF {
+                self.ppu_status.sprite_zero_hit = true;
+            }
+
+            // Pass the resulting values through a priority multiplexer to get the final pixel value
+            let multiplexed_pixel = match (bg_pixel & 0b11, sprite_pixel & 0b11, sprite_priority_over_bg) {
+                (0, 0, _) => 0x0,
+                (0, _, _) => sprite_pixel,
+                (_, 0, _) => bg_pixel,
+                (_, _, true) => sprite_pixel,
+                (_, _, false) => bg_pixel,
+            };
+
+            // Read the palette value for the current pixel
+            let palette_index = self.read_byte(0x3F00 | multiplexed_pixel as u16) & 0x3F;
+
+            palette::PALETTE_2C02[palette_index as usize]
+        } else if self.internal_registers.vram_addr & 0x3F00 == 0x3F00 {
+            palette::PALETTE_2C02[self.internal_registers.vram_addr as usize & 0x1F]
+        } else {
+            0x0
         };
 
-        // Read the palette value for the current pixel
-        let palette_index = self.read_byte(0x3F00 | multiplexed_pixel as u16) & 0x3F;
-
-        let color = palette::PALETTE_2C02[palette_index as usize];
-        let offset = ((SCREEN_WIDTH * y + x) * 4) as usize;
         self.frame_buffer[offset] = (color & 0xFF) as u8; // Blue channel
         self.frame_buffer[offset + 1] = ((color >> 8) & 0xFF) as u8; // Green channel
         self.frame_buffer[offset + 2] = (color >> 16) as u8; // Red channel
@@ -537,6 +544,13 @@ impl Iterator for Ppu {
 
         match self.scanline_state.scanline {
             0..=239 | 261 => {
+                if self.scanline_state.scanline != 261
+                    && self.scanline_state.scanline_cycle >= 1
+                    && self.scanline_state.scanline_cycle <= 256
+                {
+                    self.draw_pixel(self.scanline_state.scanline, self.scanline_state.scanline_cycle);
+                }
+
                 if self.ppu_mask.is_rendering_enabled() {
                     self.fetch_data(self.scanline_state.scanline_cycle);
 
@@ -547,13 +561,6 @@ impl Iterator for Ppu {
                             self.ppu_ctrl.sprite_size.pixels(),
                             self.ppu_ctrl.sprite_tile_table_select,
                         );
-                    }
-
-                    if self.scanline_state.scanline != 261
-                        && self.scanline_state.scanline_cycle >= 1
-                        && self.scanline_state.scanline_cycle <= 256
-                    {
-                        self.draw_pixel(self.scanline_state.scanline, self.scanline_state.scanline_cycle);
                     }
 
                     // Background registers shift on dots 2-256 322-337 inclusive EXCEPT on pre-render where they only shift during 322-337

@@ -205,7 +205,7 @@ impl MMC1ChrChip {
                 chr_bank_mode: CHRBankMode::Switch4KB,
             },
             None => MMC1ChrChip {
-                chr_data: ChrData::Ram([0; 0x2000]),
+                chr_data: ChrData::Ram(Box::new([0; 0x2000])),
                 chr_banks: if banks == 0 { 1 } else { banks },
                 ppu_vram: [0; 0x1000],
                 chr_bank: [0, 1],

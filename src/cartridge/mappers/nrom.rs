@@ -10,22 +10,22 @@ pub(crate) struct MapperZeroPrgChip {
     prg_ram: [u8; 0x2000],
 }
 
-pub(crate) struct MapperZeroChrChip {
+pub(crate) struct FixedMirroringChrChip {
     chr_data: ChrData,
     ppu_vram: [u8; 0x1000],
     mirroring_mode: MirroringMode,
 }
 
-impl MapperZeroChrChip {
-    fn new(chr_rom: Option<Vec<u8>>, mirroring_mode: MirroringMode) -> Self {
+impl FixedMirroringChrChip {
+    pub(crate) fn new(chr_rom: Option<Vec<u8>>, mirroring_mode: MirroringMode) -> Self {
         match chr_rom {
-            Some(rom) => MapperZeroChrChip {
+            Some(rom) => FixedMirroringChrChip {
                 chr_data: ChrData::Rom(rom),
                 ppu_vram: [0; 0x1000],
                 mirroring_mode,
             },
-            None => MapperZeroChrChip {
-                chr_data: ChrData::Ram([0; 0x2000]),
+            None => FixedMirroringChrChip {
+                chr_data: ChrData::Ram(Box::new([0; 0x2000])),
                 ppu_vram: [0; 0x1000],
                 mirroring_mode,
             },
@@ -50,7 +50,7 @@ impl CpuCartridgeAddressBus for MapperZeroPrgChip {
     }
 }
 
-impl PpuCartridgeAddressBus for MapperZeroChrChip {
+impl PpuCartridgeAddressBus for FixedMirroringChrChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x0000..=0x1FFF => match &self.chr_data {
@@ -112,7 +112,7 @@ pub(crate) fn from_header(
             prg_rom: full_prg_rom,
             prg_ram: [0; 0x2000],
         }),
-        Box::new(MapperZeroChrChip::new(chr_rom, header.mirroring)),
+        Box::new(FixedMirroringChrChip::new(chr_rom, header.mirroring)),
         header,
     )
 }

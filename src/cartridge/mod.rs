@@ -54,6 +54,7 @@ pub(crate) trait PpuCartridgeAddressBus {
 
 /// Represents flags/details about the rom from the header
 /// c.f. http://wiki.nesdev.com/w/index.php/INES for details
+#[derive(Debug)]
 pub(crate) struct CartridgeHeader {
     pub(crate) prg_rom_16kb_units: u8,
     pub(crate) chr_rom_8kb_units: u8,
@@ -154,6 +155,7 @@ pub(crate) fn from_file(
     match header.mapper {
         0 => Ok(mappers::nrom::from_header(prg_rom, chr_rom, header)),
         1 => Ok(mappers::mmc1::from_header(prg_rom, chr_rom, header)),
+        2 | 94 => Ok(mappers::uxrom::from_header(prg_rom, chr_rom, header)),
         _ => Err(CartridgeError {
             message: format!("Mapper {:02X} not yet implemented", header.mapper),
         }),

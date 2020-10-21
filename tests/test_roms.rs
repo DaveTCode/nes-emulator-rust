@@ -39,10 +39,10 @@ rom_tests! {
     blargg_nes_ppu_test_vbl_clear_time: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("vbl_clear_time.nes")),
     blargg_nes_ppu_test_vram_access: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("vram_access.nes")),
     //dma_2007_read: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("dma_2007_read.nes")), - Fails, unclear why
-    //dma_2007_write: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("dma_2007_write.nes")), - Passes but has one pixel line of nonsense on left of screen
+    dma_2007_write: (0xFDDCD * 3 as usize, 1314372172, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("dma_2007_write.nes")),
     //dma_4016_read: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("dma_4016_read.nes")), - Fails, unclear why
     //double_2007_read: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("double_2007_read.nes")), - Fails, unclear why
-    // read_write_2007: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("read_write_2007.nes")), - Passes but has one pixel line of nonsense on left of screen
+    read_write_2007: (0xFDDCD * 3 as usize, 2762297165, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("read_write_2007.nes")),
     branch_timing_basics: (0xCAF7C * 3 as usize, 880592341, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("1.Branch_Basics.nes")),
     branch_timing_backward: (0xCAF7C * 3 as usize, 6166974, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("2.Backward_Branch.nes")),
     branch_timing_forward: (0xCAF7C * 3 as usize, 1293237708, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("3.Forward_Branch.nes")),

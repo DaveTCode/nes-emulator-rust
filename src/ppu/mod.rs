@@ -389,7 +389,7 @@ impl Ppu {
                 }
             }
             1 => {
-                if (cycle >= 9 && cycle <= 257) || (cycle >= 329 && cycle <= 337) {
+                if (cycle >= 9 && cycle <= 257) || (cycle >= 322 && cycle <= 337) {
                     // Note we've _just_ incremented X at the previous dot so we decrement here to
                     // get the right value for the attribute calculation
                     self.scanline_state.reload_shift_registers(
@@ -414,7 +414,7 @@ impl Ppu {
                 }
             }
             3 => {
-                if cycle <= 256 || cycle >= 321 {
+                if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.internal_registers.next_address = 0x23C0
                         | (self.internal_registers.vram_addr & 0x0C00)
                         | ((self.internal_registers.vram_addr >> 4) & 0x38)
@@ -554,9 +554,14 @@ impl Iterator for Ppu {
                         && self.scanline_state.scanline_cycle <= 256
                     {
                         self.draw_pixel(self.scanline_state.scanline, self.scanline_state.scanline_cycle);
+                    }
 
-                        self.scanline_state.shift_bg_registers();
-                    } else if self.scanline_state.scanline_cycle >= 322 && self.scanline_state.scanline_cycle <= 336 {
+                    // Background registers shift on dots 2-256 322-337 inclusive EXCEPT on pre-render where they only shift during 322-337
+                    if (self.scanline_state.scanline_cycle >= 2
+                        && self.scanline_state.scanline_cycle <= 256
+                        && self.scanline_state.scanline != 261)
+                        || (self.scanline_state.scanline_cycle >= 322 && self.scanline_state.scanline_cycle <= 337)
+                    {
                         self.scanline_state.shift_bg_registers();
                     }
 

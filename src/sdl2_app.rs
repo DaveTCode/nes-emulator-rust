@@ -48,7 +48,7 @@ pub(crate) fn run(
     let mut ppu = Ppu::new(chr_address_bus);
     let mut cpu = Cpu::new(prg_address_bus, &mut apu, &mut io, &mut ppu);
     let mut time_of_last_render = time::Instant::now();
-    let frame_duration = time::Duration::from_millis(16);
+    let frame_duration = time::Duration::from_millis(17);
 
     'main: loop {
         cpu.next();
@@ -59,10 +59,6 @@ pub(crate) fn run(
 
             let framebuffer = cpu.get_framebuffer();
             texture.update(None, framebuffer, screen_width as usize * 4).unwrap();
-            // texture.with_lock(None, |buffer: &mut [u8], _: usize| {
-            //     buffer.copy_from_slice(framebuffer);
-            // }).unwrap();
-
             canvas.clear();
             canvas.copy(&texture, None, None).unwrap();
             canvas.present();

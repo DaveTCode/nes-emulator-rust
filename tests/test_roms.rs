@@ -59,7 +59,16 @@ rom_tests! {
     // oam_stress: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("oam_read").join("oam_stress.nes")), - Not working, not sure why
 
     // ----- VBL/NMI Timing Tests -----
-    // ppu_vbl_nmi: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("ppu_vbl_nmi.nes")), - Fails, unsure why, same reasons as other nmi sync tests likely
+    ppu_vbl_nmi_01_basics: (0x4FF06A * 3 as usize, 3760518270, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("01-vbl_basics.nes")),
+    // ppu_vbl_nmi_02_vbl_set_time: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("02-vbl_set_time.nes")), - Failing
+    ppu_vbl_nmi_03_clear_time: (0x4DAAC6 * 3 as usize, 2257284403, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("03-vbl_clear_time.nes")),
+    // ppu_vbl_nmi_04_nmi_control: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("04-nmi_control.nes")), - Failed #5
+    // ppu_vbl_nmi_05_nmi_timing: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("05-nmi_timing.nes")), - Failed
+    // ppu_vbl_nmi_06_suppression: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("06-suppression.nes")), - Failed
+    // ppu_vbl_nmi_07_nmi_on_timing: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("07-nmi_on_timing.nes")), - Failed
+    // ppu_vbl_nmi_08_nmi_off_timing: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("08-nmi_off_timing.nes")), - Failed
+    ppu_vbl_nmi_09_even_odd_frames: (0x43AB75 * 3 as usize, 817319831, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("09-even_odd_frames.nes")),
+    // ppu_vbl_nmi_10_even_odd_timing: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("10-even_odd_timing.nes")), - Failed #3 Clock is skipped too late
     vbl_nmi_timing_frame_basics: (0x5CA9A1 * 3 as usize, 3792590752, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("1.frame_basics.nes")),
     // vbl_nmi_timing_vbl_timing: (0x5CA9A1 * 3 as usize, 3792590752, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("2.vbl_timing.nes")),- TODO - Failing on #8 no suppress
     // vbl_nmi_timing_even_odd_frames: (0x5CA9A1 * 3 as usize, 3792590752, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("3.even_odd_frames.nes")), - TODO - Failing on #3

@@ -324,31 +324,28 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
         }
         self.load_register.last_write_cycle = cycles;
 
-        match address {
-            0x8000..=0xFFFF => {
-                if value & 0b1000_0000 != 0 {
+        if let 0x8000..=0xFFFF = address {
+            if value & 0b1000_0000 != 0 {
+                self.load_register.value = 0;
+                self.load_register.shift_writes = 0;
+                self.update_control_register(0x0C);
+            } else {
+                self.load_register.value |= (value & 1) << self.load_register.shift_writes;
+                self.load_register.shift_writes += 1;
+
+                if self.load_register.shift_writes == 5 {
+                    match address {
+                        0x8000..=0x9FFF => self.update_control_register(self.load_register.value),
+                        0xA000..=0xBFFF => self.update_chr_bank(self.load_register.value, 0),
+                        0xC000..=0xDFFF => self.update_chr_bank(self.load_register.value, 1),
+                        0xE000..=0xFFFF => (), // Rust ownership...this write is handled by the PRG bus
+                        _ => panic!("Invalid MMC1 address {:04X}={:02X}", address, value),
+                    }
+
                     self.load_register.value = 0;
                     self.load_register.shift_writes = 0;
-                    self.update_control_register(0x0C);
-                } else {
-                    self.load_register.value |= (value & 1) << self.load_register.shift_writes;
-                    self.load_register.shift_writes += 1;
-
-                    if self.load_register.shift_writes == 5 {
-                        match address {
-                            0x8000..=0x9FFF => self.update_control_register(self.load_register.value),
-                            0xA000..=0xBFFF => self.update_chr_bank(self.load_register.value, 0),
-                            0xC000..=0xDFFF => self.update_chr_bank(self.load_register.value, 1),
-                            0xE000..=0xFFFF => (), // Rust ownership...this write is handled by the PRG bus
-                            _ => panic!("Invalid MMC1 address {:04X}={:02X}", address, value),
-                        }
-
-                        self.load_register.value = 0;
-                        self.load_register.shift_writes = 0;
-                    }
                 }
             }
-            _ => (), // TODO - Do writes to anywhere else do anything?
         }
     }
 }

@@ -4,7 +4,7 @@ use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
 use log::info;
 
-fn nrom_write_byte_function(_: u16, _: u8, _: u8, _: &mut [u8; 2], _: &mut [usize; 2]) {}
+fn cnrom_update_banks(_: u16, _: u8, _: u8, _: &mut [u8; 2], _: &mut [usize; 2]) {}
 
 pub(crate) fn from_header(
     prg_rom: Vec<u8>,
@@ -15,17 +15,17 @@ pub(crate) fn from_header(
     Box<dyn PpuCartridgeAddressBus>,
     CartridgeHeader,
 ) {
-    info!("Creating NROM mapper for cartridge");
+    info!("Creating CNROM mapper for cartridge {:?}", header);
     (
         Box::new(BankedPrgChip::new(
             prg_rom,
-            Some([0; 0x2000]),
-            2,
+            None,
+            header.prg_rom_16kb_units,
             [0, 1],
             [0, 0x4000],
-            nrom_write_byte_function,
+            cnrom_update_banks,
         )),
-        Box::new(BankedChrChip::new(chr_rom, header.mirroring, 1)),
+        Box::new(BankedChrChip::new(chr_rom, header.mirroring, header.chr_rom_8kb_units)),
         header,
     )
 }

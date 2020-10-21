@@ -165,15 +165,18 @@ impl super::Ppu {
                     (self.sprite_data.sprites[sprite_index].high_byte_shift_register & 0b1000_0000) >> 7;
                 let color_val = color_low_bit | (color_high_bit << 1);
 
-                let palette_number = self.sprite_data.sprites[sprite_index].attribute_latch.palette;
+                // Keep looking until we find a non-transparent pixel
+                if color_val != 0 {
+                    let palette_number = self.sprite_data.sprites[sprite_index].attribute_latch.palette;
 
-                result = (
-                    0b10000 | (palette_number << 2) | color_val,
-                    self.sprite_data.sprites[sprite_index].attribute_latch.priority,
-                    sprite_index == 0,
-                );
+                    result = (
+                        0b10000 | (palette_number << 2) | color_val,
+                        self.sprite_data.sprites[sprite_index].attribute_latch.priority,
+                        sprite_index == 0,
+                    );
 
-                found_pixel = true;
+                    found_pixel = true;
+                }
             }
 
             // Shift the registers

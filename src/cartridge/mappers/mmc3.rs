@@ -51,7 +51,12 @@ impl MMC3PrgChip {
             PRGBankMode::HighBankSwappable => {
                 self.prg_bank_offsets[2] = self.prg_banks[0] as usize * 0x2000;
             }
-        }
+        };
+
+        info!(
+            "MMC3 PRG bank offsets updated {:?} -> {:?}",
+            self.prg_banks, self.prg_bank_offsets
+        );
     }
 }
 
@@ -174,7 +179,12 @@ impl MMC3ChrChip {
                     self.chr_bank_offsets[(i + 4) % 8] = self.chr_banks[i] as usize * 0x400;
                 }
             }
-        }
+        };
+
+        info!(
+            "MMC3 CHR bank offsets updated {:?} -> {:?}",
+            self.chr_banks, self.chr_bank_offsets
+        );
     }
 }
 
@@ -258,6 +268,8 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
                     } else {
                         MirroringMode::Horizontal
                     };
+
+                    info!("MMC3 mirroring mode change {:?}", self.mirroring_mode);
                 }
             }
             // IRQ Latch & IRQ Reload registers - TODO - Implement IRQ counter
@@ -279,7 +291,11 @@ pub(crate) fn from_header(
     CartridgeHeader,
 ) {
     (
-        Box::new(MMC3PrgChip::new(prg_rom, header.prg_rom_16kb_units, Some([0; 0x2000]))),
+        Box::new(MMC3PrgChip::new(
+            prg_rom,
+            header.prg_rom_16kb_units * 2,
+            Some([0; 0x2000]),
+        )),
         Box::new(MMC3ChrChip::new(
             chr_rom.unwrap(),
             header.chr_rom_8kb_units * 2,

@@ -47,9 +47,11 @@ impl MMC3PrgChip {
         match self.bank_mode {
             PRGBankMode::LowBankSwappable => {
                 self.prg_bank_offsets[0] = self.prg_banks[0] as usize * 0x2000;
+                self.prg_bank_offsets[2] = self.prg_banks[2] as usize * 0x2000;
             }
             PRGBankMode::HighBankSwappable => {
                 self.prg_bank_offsets[2] = self.prg_banks[0] as usize * 0x2000;
+                self.prg_bank_offsets[0] = self.prg_banks[2] as usize * 0x2000;
             }
         };
 

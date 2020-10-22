@@ -156,10 +156,10 @@ pub(crate) struct MMC3ChrChip {
 }
 
 impl MMC3ChrChip {
-    fn new(chr_rom: Vec<u8>, banks: u8, mirroring_mode: MirroringMode) -> Self {
+    fn new(chr_rom: Vec<u8>, total_chr_banks: u8, mirroring_mode: MirroringMode) -> Self {
         MMC3ChrChip {
             chr_data: chr_rom,
-            total_chr_banks: banks,
+            total_chr_banks,
             ppu_vram: [0; 0x1000],
             chr_banks: [0, 1, 2, 3, 4, 5, 6, 7],
             chr_bank_offsets: [0x0000, 0x0400, 0x0800, 0x0C00, 0x1000, 0x1400, 0x1800, 0x1C00],
@@ -300,7 +300,7 @@ pub(crate) fn from_header(
         )),
         Box::new(MMC3ChrChip::new(
             chr_rom.unwrap(),
-            header.chr_rom_8kb_units * 2,
+            header.chr_rom_8kb_units * 4,
             header.mirroring,
         )),
         header,

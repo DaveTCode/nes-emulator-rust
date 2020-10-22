@@ -29,6 +29,7 @@ macro_rules! rom_tests {
 rom_tests! {
     // ----- General CPU Tests -----
     blargg_nes_cpu_test_official: (0x13399B3 * 3 as usize, 2605351162, Path::new(".").join("roms").join("test").join("blargg_nes_cpu_test5").join("official.nes")),
+    instr_test_official_only: (0x33B7410 * 3 as usize, 216765697, Path::new(".").join("roms").join("test").join("instr_test-v3").join("official_only.nes")),
     cpu_timing_test: (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("cpu_timing_test6").join("cpu_timing_test.nes")),
     // instr_misc:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_misc").join("instr_misc.nes")), - Requires APU length counter (singles up to that pass)
     // instr_timing:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_timing").join("instr_timing.nes")), - Requires APU length counter
@@ -102,7 +103,7 @@ rom_tests! {
     mapper_2: (0x269657 * 3 as usize, 2497135805, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),
     mapper_3: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
     // mapper_4_no_chrom: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")), - No support for CHRRAM on MMC3 board at the moment
-    // mapper_4_p256k_c256k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")), - No output, MMC3 is probably just not properly implemented
+    // mapper_4_p256k_c256k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")), - 0A10 output
 }
 
 const ASCII_GRAYSCALE_ARRAY: [char; 96] = [
@@ -126,7 +127,7 @@ fn framebuffer_to_ascii_art(fb: [u8; (256 * 240 * 4) as usize]) -> String {
 
             (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255f32
         })
-        .map(|greyscale| lookup(greyscale))
+        .map(lookup)
         .collect::<Vec<char>>()
         .chunks(256)
         .map(|char_line| char_line.into_iter().collect::<String>())

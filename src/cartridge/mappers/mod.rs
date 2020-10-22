@@ -2,10 +2,11 @@ use cartridge::mirroring::MirroringMode;
 use cartridge::{CpuCartridgeAddressBus, PpuCartridgeAddressBus};
 use log::debug;
 
-pub(super) mod cnrom;
+pub(super) mod cnrom; // Mapper 3
 pub(super) mod mmc1; // Mapper 1
+pub(super) mod mmc3; // Mapper 4
 pub(super) mod nrom; // Mapper 0
-pub(super) mod uxrom; // Mapper 2, 94, 180 // Mapper 3
+pub(super) mod uxrom; // Mapper 2, 94, 180
 
 pub(crate) enum ChrData {
     Rom(Vec<u8>),
@@ -60,7 +61,7 @@ impl CpuCartridgeAddressBus for BankedPrgChip {
             },
             0x8000..=0xBFFF => self.prg_rom[self.prg_rom_bank_offsets[0] + (address as usize - 0x8000)],
             0xC000..=0xFFFF => self.prg_rom[self.prg_rom_bank_offsets[1] + (address as usize - 0xC000)],
-            _ => panic!("Unmapped addresses in UxROM {:04X}", address),
+            _ => 0x0, // TODO - Not 100% sure on this, but mapper tests do check it.
         }
     }
 
@@ -79,7 +80,7 @@ impl CpuCartridgeAddressBus for BankedPrgChip {
                 &mut self.prg_rom_banks,
                 &mut self.prg_rom_bank_offsets,
             ),
-            _ => panic!("Unmapped addresses in UxROM {:04X}", address),
+            _ => (), // TODO - Not 100% sure on this, but mapper tests do check it.
         }
     }
 }

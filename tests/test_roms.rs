@@ -30,7 +30,8 @@ rom_tests! {
     // ----- General CPU Tests -----
     blargg_nes_cpu_test_official: (0x13399B3 * 3 as usize, 2605351162, Path::new(".").join("roms").join("test").join("blargg_nes_cpu_test5").join("official.nes")),
     cpu_timing_test: (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("cpu_timing_test6").join("cpu_timing_test.nes")),
-    // instr_misc:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_misc").join("instr_misc.nes")), - Failing due to unimplemented APU length counter (singles up to that pass)
+    // instr_misc:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_misc").join("instr_misc.nes")), - Requires APU length counter (singles up to that pass)
+    // instr_timing:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_timing").join("instr_timing.nes")), - Requires APU length counter
     cpu_dummy_reads: (0x18F464 * 3 as usize, 2170164011, Path::new(".").join("roms").join("test").join("cpu_dummy_reads").join("cpu_dummy_reads.nes")),
     cpu_dummy_writes_oam: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_writes").join("cpu_dummy_writes_oam.nes")),
     // cpu_dummy_writes_ppumem: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_writes").join("cpu_dummy_writes_ppumem.nes")), # Opcodes are fine but open bus behaviour is wrong apparently
@@ -45,7 +46,7 @@ rom_tests! {
     blargg_nes_ppu_test_vbl_clear_time: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("vbl_clear_time.nes")),
     blargg_nes_ppu_test_vram_access: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("vram_access.nes")),
     // ppu_open_bus: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_open_bus").join("ppu_open_bus.nes")), - Not working, claims because no decay
-    // ppu_read_buffer: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_read_buffer").join("test_ppu_read_buffer.nes")), - Requires MMC3 support
+    // ppu_read_buffer: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_read_buffer").join("test_ppu_read_buffer.nes")), - Crashes trying to read invalid address from PPU 2007
 
     // ----- DMA/DMC Specific Tests -----
     //dma_2007_read: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("dma_2007_read.nes")), - Fails, unclear why
@@ -88,6 +89,20 @@ rom_tests! {
     sprite_zero_hit_08_double_height: (0x1DF406 * 3 as usize, 3281055842, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("08-double_height.nes")),
     //sprite_zero_hit_09_timing: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("09-timing.nes")),
     //sprite_zero_hit_10_timing_order: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("10-timing_order.nes")),
+
+    // ----- Mapper Tests -----
+    mapper_0: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_C8K_V.nes")),
+    // mapper_1_no_chrom: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K.nes")), // Result 0003 instead of 0000
+    // mapper_1_p128K_c128k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K.nes")), // Crashes on addition overflow
+    // mapper_1_p128K_c128k_s8k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_S8K.nes")), // Crashes on addition overflow
+    // mapper_1_p128K_c128k_w8k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_W8K.nes")), // Crashes on addition overflow
+    // mapper_1_p128K_c32k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K.nes")), // No output
+    // mapper_1_p128K_c32k_s8k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_S8K.nes")), // No output
+    // mapper_1_p128K_c32k_w8k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_W8K.nes")), // No output
+    mapper_2: (0x269657 * 3 as usize, 2497135805, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),
+    mapper_3: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
+    // mapper_4_no_chrom: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")), - No support for CHRRAM on MMC3 board at the moment
+    // mapper_4_p256k_c256k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")), - No output, MMC3 is probably just not properly implemented
 }
 
 const ASCII_GRAYSCALE_ARRAY: [char; 96] = [

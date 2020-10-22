@@ -4,6 +4,7 @@ pub(crate) enum MirroringMode {
     OneScreenUpperBank,
     Vertical,
     Horizontal,
+    FourScreen,
 }
 
 impl MirroringMode {
@@ -22,6 +23,7 @@ impl MirroringMode {
             }
             MirroringMode::OneScreenLowerBank => adjusted_address % 0x400,
             MirroringMode::OneScreenUpperBank => (adjusted_address % 0x400) + 0x400,
+            MirroringMode::FourScreen => adjusted_address,
         }
     }
 }

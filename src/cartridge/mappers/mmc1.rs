@@ -37,7 +37,7 @@ impl LoadRegister {
 pub(crate) struct MMC1PrgChip {
     prg_rom: Vec<u8>,
     prg_banks: u8,
-    prg_ram: [u8; 0x2000],
+    prg_ram: Option<[u8; 0x2000]>,
     prg_ram_enabled: bool,
     prg_bank_mode: PRGBankMode,
     prg_bank: u8,
@@ -46,13 +46,13 @@ pub(crate) struct MMC1PrgChip {
 }
 
 impl MMC1PrgChip {
-    fn new(prg_rom: Vec<u8>, prg_banks: u8) -> Self {
+    fn new(prg_rom: Vec<u8>, prg_banks: u8, prg_ram: Option<[u8; 0x2000]>) -> Self {
         debug_assert!(prg_rom.len() >= 0x4000);
 
         let mut chip = MMC1PrgChip {
             prg_rom,
             prg_banks,
-            prg_ram: [0; 0x2000],
+            prg_ram,
             prg_ram_enabled: true,
             prg_bank_mode: PRGBankMode::FixLast16KB,
             prg_bank: 0,
@@ -117,13 +117,16 @@ impl MMC1PrgChip {
 impl CpuCartridgeAddressBus for MMC1PrgChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x6000..=0x7FFF => {
-                if self.prg_ram_enabled {
-                    self.prg_ram[(address - 0x6000) as usize]
-                } else {
-                    0x0
+            0x6000..=0x7FFF => match self.prg_ram {
+                Some(ram) => {
+                    if self.prg_ram_enabled {
+                        ram[(address - 0x6000) as usize]
+                    } else {
+                        0x0
+                    }
                 }
-            }
+                None => 0x0,
+            },
             0x8000..=0xBFFF => {
                 let adj_addr = address as usize - 0x8000;
 
@@ -146,12 +149,15 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
         self.load_register.last_write_cycle = cycles;
 
         match address {
-            0x6000..=0x7FFF => {
-                if self.prg_ram_enabled {
-                    // TODO - some variants of MMC1 always have RAM enabled
-                    self.prg_ram[(address - 0x6000) as usize] = value;
+            0x6000..=0x7FFF => match self.prg_ram {
+                Some(mut ram) => {
+                    if self.prg_ram_enabled {
+                        // TODO - some variants of MMC1 always have RAM enabled
+                        ram[(address - 0x6000) as usize] = value;
+                    }
                 }
-            }
+                None => (),
+            },
             0x8000..=0xFFFF => {
                 if value & 0b1000_0000 != 0 {
                     self.load_register.value = 0;
@@ -185,7 +191,7 @@ pub(crate) struct MMC1ChrChip {
     chr_banks: u8,
     ppu_vram: [u8; 0x1000],
     chr_bank: [u8; 2],
-    chr_bank_offsets: [u16; 2],
+    chr_bank_offsets: [usize; 2],
     load_register: LoadRegister,
     mirroring_mode: MirroringMode,
     chr_bank_mode: CHRBankMode,
@@ -259,11 +265,11 @@ impl MMC1ChrChip {
     fn update_bank_offsets(&mut self) {
         match self.chr_bank_mode {
             CHRBankMode::Switch4KB => {
-                self.chr_bank_offsets[0] = self.chr_bank[0] as u16 * 0x1000;
-                self.chr_bank_offsets[1] = self.chr_bank[1] as u16 * 0x1000;
+                self.chr_bank_offsets[0] = self.chr_bank[0] as usize * 0x1000;
+                self.chr_bank_offsets[1] = self.chr_bank[1] as usize * 0x1000;
             }
             CHRBankMode::Switch8KB => {
-                self.chr_bank_offsets[0] = (self.chr_bank[0] >> 1) as u16 * 0x1000;
+                self.chr_bank_offsets[0] = (self.chr_bank[0] >> 1) as usize * 0x1000;
                 self.chr_bank_offsets[1] = self.chr_bank_offsets[0] + 0x1000;
             }
         }
@@ -275,9 +281,9 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
         match address {
             0x0000..=0x1FFF => {
                 let adjusted_address = if address & 0x1000 == 0 {
-                    address + self.chr_bank_offsets[0]
+                    address as usize + self.chr_bank_offsets[0]
                 } else {
-                    (address & 0xFFF) + self.chr_bank_offsets[1]
+                    (address & 0xFFF) as usize + self.chr_bank_offsets[1]
                 };
 
                 match &self.chr_data {
@@ -360,7 +366,11 @@ pub(crate) fn from_header(
     CartridgeHeader,
 ) {
     (
-        Box::new(MMC1PrgChip::new(prg_rom, header.prg_rom_16kb_units)),
+        Box::new(MMC1PrgChip::new(
+            prg_rom,
+            header.prg_rom_16kb_units,
+            if header.has_ram { Some([0; 0x2000]) } else { None },
+        )),
         Box::new(MMC1ChrChip::new(chr_rom, header.chr_rom_8kb_units * 2)),
         header,
     )
@@ -373,7 +383,7 @@ mod mmc1_tests {
 
     #[test]
     fn test_change_bank() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, None);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
@@ -385,7 +395,7 @@ mod mmc1_tests {
 
     #[test]
     fn test_change_bank_needs_wrap() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 2], 2);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 2], 2, None);
         mmc1.write_byte(0xE000, 0b0011, 0);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
@@ -397,7 +407,7 @@ mod mmc1_tests {
 
     #[test]
     fn test_ignore_sequential_writes() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, None);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 2);
         mmc1.write_byte(0xE000, 0b0000, 4);
@@ -412,7 +422,7 @@ mod mmc1_tests {
     #[test]
     fn test_set_control_register() {
         let value = 0b1111;
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, None);
         mmc1.write_byte(0x8000, 0, 0);
         mmc1.write_byte(0x8000, 0, 2);
         mmc1.write_byte(0x8000, 0, 4);

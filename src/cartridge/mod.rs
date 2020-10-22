@@ -60,7 +60,24 @@ pub(crate) struct CartridgeHeader {
     pub(crate) chr_rom_8kb_units: u8,
     pub(crate) mapper: u8,
     pub(crate) mirroring: MirroringMode,
+    pub(crate) has_ram: bool,
     // TODO - Lots more flags and possible options
+}
+
+impl CartridgeHeader {
+    fn new(prg_rom_16kb_units: u8, chr_rom_8kb_units: u8, flags_6: u8, flags_7: u8) -> Self {
+        CartridgeHeader {
+            prg_rom_16kb_units,
+            chr_rom_8kb_units,
+            mapper: (flags_6 >> 4) | (flags_7 & 0b1111_0000),
+            mirroring: match (flags_6 & 1 == 0, flags_6 & 0b1000 == 0) {
+                (true, true) => MirroringMode::Horizontal,
+                (false, true) => MirroringMode::Vertical,
+                (_, false) => MirroringMode::FourScreen,
+            },
+            has_ram: flags_6 & 0b10 == 0b10,
+        }
+    }
 }
 
 impl fmt::Display for CartridgeHeader {
@@ -124,17 +141,9 @@ pub(crate) fn from_file(
         });
     }
 
-    let header = CartridgeHeader {
-        prg_rom_16kb_units: bytes[4],
-        chr_rom_8kb_units: bytes[5],
-        mapper: (bytes[6] >> 4) | (bytes[7] & 0b1111_0000),
-        mirroring: match bytes[6] & 1 == 0 {
-            true => MirroringMode::Horizontal,
-            false => MirroringMode::Vertical,
-        },
-    };
+    let header = CartridgeHeader::new(bytes[4], bytes[5], bytes[6], bytes[7]);
 
-    info!("{}: {:02X} {:02X}", header, bytes[6], bytes[7]);
+    info!("{}: {:08b} {:08b}", header, bytes[6], bytes[7]);
 
     let prg_rom_start = 0x10 as usize;
     let prg_rom_end = prg_rom_start + (header.prg_rom_16kb_units as usize * 0x4000);
@@ -157,6 +166,7 @@ pub(crate) fn from_file(
         1 => Ok(mappers::mmc1::from_header(prg_rom, chr_rom, header)),
         2 | 94 => Ok(mappers::uxrom::from_header(prg_rom, chr_rom, header)),
         3 => Ok(mappers::cnrom::from_header(prg_rom, chr_rom, header)),
+        4 => Ok(mappers::mmc3::from_header(prg_rom, chr_rom, header)),
         _ => Err(CartridgeError {
             message: format!("Mapper {:02X} not yet implemented", header.mapper),
         }),

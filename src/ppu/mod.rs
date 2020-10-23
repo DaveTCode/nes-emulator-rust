@@ -243,7 +243,14 @@ impl Ppu {
                     self.nmi_set_cycle = self.total_cycles;
                     info!("Triggering NMI");
                 }
+
                 self.ppu_ctrl.write_byte(value);
+
+                // Setting NMI disabled within 1 cycle of triggering it will suppress as well
+                if !self.ppu_ctrl.nmi_enable && self.nmi_set_cycle >= self.total_cycles - 2 {
+                    self.trigger_nmi = false;
+                }
+
                 self.internal_registers.temp_vram_addr =
                     (self.internal_registers.temp_vram_addr & 0xF3FF) | ((value & 0b11) as u16) << 10;
             }

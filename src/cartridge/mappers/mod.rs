@@ -118,7 +118,11 @@ impl BankedChrChip {
 }
 
 impl PpuCartridgeAddressBus for BankedChrChip {
-    fn read_byte(&self, address: u16) -> u8 {
+    fn check_trigger_irq(&mut self) -> bool {
+        false
+    }
+
+    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
         match address {
             0x0000..=0x1FFF => match &self.chr_data {
                 ChrData::Rom(rom) => rom[address as usize + self.chr_bank_offset],

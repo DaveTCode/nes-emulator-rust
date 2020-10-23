@@ -92,18 +92,29 @@ rom_tests! {
     //sprite_zero_hit_10_timing_order: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("10-timing_order.nes")),
 
     // ----- Mapper Tests -----
-    mapper_0: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_C8K_V.nes")),
-    // mapper_1_no_chrom: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K.nes")), // Result 0003 instead of 0000
-    // mapper_1_p128K_c128k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K.nes")), // Crashes on addition overflow
-    // mapper_1_p128K_c128k_s8k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_S8K.nes")), // Crashes on addition overflow
-    // mapper_1_p128K_c128k_w8k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_W8K.nes")), // Crashes on addition overflow
-    // mapper_1_p128K_c32k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K.nes")), // No output
-    // mapper_1_p128K_c32k_s8k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_S8K.nes")), // No output
-    // mapper_1_p128K_c32k_w8k: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_W8K.nes")), // No output
-    mapper_2: (0x269657 * 3 as usize, 2497135805, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),
-    mapper_3: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
-    // mapper_4_no_chrom: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")), - No support for CHRRAM on MMC3 board at the moment
+    mapper_0_p32k_c8k_v: (0x56A32 * 3 as usize, 469175584, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_C8K_V.nes")),
+    mapper_0_p32k_cr8k_v: (0x270AAB * 3 as usize, 3621921473, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR8K_V.nes")),
+    mapper_0_p32k_cr32k_v: (0x270AAB * 3 as usize, 3621921473, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR32K_V.nes")),
+    // mapper_1_no_chrom: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K.nes")), - 0003 output (bad CHR somehow)
+    mapper_1_p128k_c32k: (0x48189 * 3 as usize, 1806907890, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K.nes")),
+    mapper_1_p128k_c32k_s8k: (0x48189 * 3 as usize, 1806907890, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_S8K.nes")),
+    mapper_1_p128k_c32k_w8k: (0x48189 * 3 as usize, 1806907890, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_W8K.nes")),
+    mapper_1_p128k_c128k: (0x48189 * 3 as usize, 2153594427, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K.nes")),
+    mapper_1_p128k_c128k_s8k: (0x48189 * 3 as usize, 2153594427, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_S8K.nes")),
+    mapper_1_p128k_c128k_w8k: (0x48189 * 3 as usize, 2153594427, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_W8K.nes")),
+    mapper_2_p128k_cr8k_v: (0x253959 * 3 as usize, 1058817094, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_CR8K_V.nes")),
+    mapper_2_p128k_v: (0x24C505 * 3 as usize, 3178533875, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),
+    mapper_3: (0x90CD6 * 3 as usize, 3952353136, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
+    // mapper_4_no_chrom: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")), - 0A13 output (all broken)
     // mapper_4_p256k_c256k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")), - 0A10 output
+
+    // ----- MMC3 IRQ Tests -----
+    //mmc3_irq_clocking: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("1-clocking.nes")), // Failed #3 - Doesn't handle PPUADDR causing changes
+    //mmc3_irq_details: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("2-details.nes")), // Failed #2 - Counter isn't working when reloaded with 255
+    //mmc3_irq_a12_clocking: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("3-A12_clocking.nes")), // Failed #4 - Failure due to PPUADDR changes again
+    //mmc3_irq_scanline_timing: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("4-scanline_timing.nes")), // Failed #14 - IRQ never occurred
+    //mmc3_irq_mmc3: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("5-MMC3.nes")), // Failed #2 - Should reload and set IRQ every clock when reload is 0
+    //mmc3_irq_mmc3_alt: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("6-MMC3_alt.nes")), // Failed #2 - Don't think I support the MMC3 alternate board
 }
 
 const ASCII_GRAYSCALE_ARRAY: [char; 96] = [

@@ -268,22 +268,31 @@ impl MMC1ChrChip {
                 self.chr_bank_offsets[1] = self.chr_bank[1] as usize * 0x1000;
             }
             CHRBankMode::Switch8KB => {
-                self.chr_bank_offsets[0] = (self.chr_bank[0] >> 1) as usize * 0x1000;
+                self.chr_bank_offsets[0] = self.chr_bank[0] as usize * 0x1000;
                 self.chr_bank_offsets[1] = self.chr_bank_offsets[0] + 0x1000;
             }
+        }
+    }
+
+    fn get_banked_address(address: u16, bank_offset_0: usize, bank_offset_1: usize) -> usize {
+        if address & 0x1000 == 0 {
+            address as usize + bank_offset_0
+        } else {
+            (address & 0xFFF) as usize + bank_offset_1
         }
     }
 }
 
 impl PpuCartridgeAddressBus for MMC1ChrChip {
-    fn read_byte(&self, address: u16) -> u8 {
+    fn check_trigger_irq(&mut self) -> bool {
+        false
+    }
+
+    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
         match address {
             0x0000..=0x1FFF => {
-                let adjusted_address = if address & 0x1000 == 0 {
-                    address as usize + self.chr_bank_offsets[0]
-                } else {
-                    (address & 0xFFF) as usize + self.chr_bank_offsets[1]
-                };
+                let adjusted_address =
+                    MMC1ChrChip::get_banked_address(address, self.chr_bank_offsets[0], self.chr_bank_offsets[1]);
 
                 match &self.chr_data {
                     ChrData::Rom(rom) => rom[adjusted_address as usize],
@@ -304,10 +313,14 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
         debug!("MMC1 CHR write {:04X}={:02X}", address, value);
         match address {
-            0x0000..=0x1FFF => match &mut self.chr_data {
-                ChrData::Rom(_) => (),
-                ChrData::Ram(ram) => ram[address as usize] = value,
-            },
+            0x0000..=0x1FFF => {
+                if let ChrData::Ram(ram) = &mut self.chr_data {
+                    let adjusted_address =
+                        MMC1ChrChip::get_banked_address(address, self.chr_bank_offsets[0], self.chr_bank_offsets[1]);
+
+                    ram[adjusted_address as usize] = value
+                }
+            }
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
 

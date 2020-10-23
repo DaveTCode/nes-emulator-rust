@@ -1001,6 +1001,15 @@ impl<'a> Cpu<'a> {
                 self.state = State::Interrupt(InterruptState::InternalOps1(Interrupt::NMI));
 
                 info!("Starting NMI interrupt");
+            } else if self.ppu.check_trigger_irq()
+                && !self
+                    .registers
+                    .status_register
+                    .contains(StatusFlags::INTERRUPT_DISABLE_FLAG)
+            {
+                self.state = State::Interrupt(InterruptState::InternalOps1(Interrupt::IRQ));
+
+                info!("Starting IRQ interrupt triggered by PPU");
             } else if self.trigger_dma {
                 // Also check whether we're starting DMA on the next cycle
                 self.trigger_dma = false;
@@ -1029,7 +1038,7 @@ impl<'a> Cpu<'a> {
         &self.ppu.frame_buffer
     }
 
-    pub(super) fn dump_ppu_state(&self, vram_clone: &mut [u8; 0x4000]) -> &[u8; 0x100] {
+    pub(super) fn dump_ppu_state(&mut self, vram_clone: &mut [u8; 0x4000]) -> &[u8; 0x100] {
         self.ppu.dump_state(vram_clone)
     }
 }

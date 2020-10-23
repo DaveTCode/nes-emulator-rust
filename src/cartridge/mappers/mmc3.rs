@@ -1,3 +1,5 @@
+use cartridge::mappers::mmc1::MMC1ChrChip;
+use cartridge::mappers::ChrData;
 use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
@@ -144,7 +146,7 @@ enum CHRBankMode {
 }
 
 pub(crate) struct MMC3ChrChip {
-    chr_data: Vec<u8>,
+    chr_data: ChrData,
     total_chr_banks: u8,
     ppu_vram: [u8; 0x1000],
     chr_banks: [u8; 8],
@@ -153,12 +155,26 @@ pub(crate) struct MMC3ChrChip {
     bank_mode: CHRBankMode,
     /// 0b000-0b111 -> The register to be written to on next write to BankData
     bank_select: u8,
+    /// Track the cycle on which we last noticed an A12 change to low
+    /// It takes 6 cycles at low voltage before a high voltage causes a counter decrement
+    /// This is set to 0 whenever we see A12 high, if it was >=6 then we trigger a count
+    a12_cycles_at_first_low: Option<u32>,
+    /// IRQ register holding the value to load into the counter on the next reload
+    irq_latch: u8,
+    /// Set on reload to note that on the next rising edge the counter will get reloaded with the IRQ latch
+    reload_irq_next_rising_edge: bool,
+    /// Current IRQ counter value
+    irq_counter: u8,
+    /// Set via C000/C001 register pair to determine whether IRQ counter getting to zero triggers an IRQ or not
+    irq_enabled: bool,
+    /// Internal bookkeeping to tell the CPU whether it needs to process an IRQ
+    irq_triggered: bool,
 }
 
 impl MMC3ChrChip {
-    fn new(chr_rom: Vec<u8>, total_chr_banks: u8, mirroring_mode: MirroringMode) -> Self {
+    fn new(chr_data: ChrData, total_chr_banks: u8, mirroring_mode: MirroringMode) -> Self {
         MMC3ChrChip {
-            chr_data: chr_rom,
+            chr_data,
             total_chr_banks,
             ppu_vram: [0; 0x1000],
             chr_banks: [0, 1, 2, 3, 4, 5, 6, 7],
@@ -166,6 +182,12 @@ impl MMC3ChrChip {
             mirroring_mode,
             bank_mode: CHRBankMode::LowBank2KB,
             bank_select: 0,
+            a12_cycles_at_first_low: None,
+            irq_latch: 0,
+            reload_irq_next_rising_edge: false,
+            irq_counter: 0,
+            irq_enabled: false,
+            irq_triggered: false,
         }
     }
 
@@ -188,35 +210,83 @@ impl MMC3ChrChip {
             self.chr_banks, self.chr_bank_offsets
         );
     }
+
+    fn clock_irq_counter(&mut self) {
+        if self.reload_irq_next_rising_edge {
+            self.irq_counter = self.irq_latch;
+        } else if self.irq_counter == 0 {
+            if self.irq_enabled {
+                self.irq_triggered = true;
+            }
+
+            self.irq_counter = self.irq_latch;
+        } else {
+            self.irq_counter -= 1;
+        }
+    }
+
+    fn update_a12(&mut self, address: u16, cycles: u32) {
+        self.a12_cycles_at_first_low = match (address & 0x1000 == 0x1000, self.a12_cycles_at_first_low) {
+            (false, None) => Some(cycles),
+            (false, Some(c)) => Some(c),
+            (true, Some(6..=u32::MAX)) => {
+                self.clock_irq_counter();
+                None
+            }
+            (true, _) => None,
+        };
+    }
 }
 
 impl PpuCartridgeAddressBus for MMC3ChrChip {
-    fn read_byte(&self, address: u16) -> u8 {
-        match address {
-            0x0000..=0x03FF => self.chr_data[address as usize - 0x0000 + self.chr_bank_offsets[0]],
-            0x0400..=0x07FF => self.chr_data[address as usize - 0x0400 + self.chr_bank_offsets[1]],
-            0x0800..=0x0BFF => self.chr_data[address as usize - 0x0800 + self.chr_bank_offsets[2]],
-            0x0C00..=0x0FFF => self.chr_data[address as usize - 0x0C00 + self.chr_bank_offsets[3]],
-            0x1000..=0x13FF => self.chr_data[address as usize - 0x1000 + self.chr_bank_offsets[4]],
-            0x1400..=0x17FF => self.chr_data[address as usize - 0x1400 + self.chr_bank_offsets[5]],
-            0x1800..=0x1BFF => self.chr_data[address as usize - 0x1800 + self.chr_bank_offsets[6]],
-            0x1C00..=0x1FFF => self.chr_data[address as usize - 0x1C00 + self.chr_bank_offsets[7]],
-            0x2000..=0x3EFF => {
+    fn check_trigger_irq(&mut self) -> bool {
+        self.irq_triggered
+    }
+
+    fn read_byte(&mut self, address: u16, cycles: u32) -> u8 {
+        self.update_a12(address, cycles);
+
+        match (address, &self.chr_data) {
+            (0x0000..=0x1FFF, ChrData::Ram(ram)) => ram[address as usize],
+            (0x0000..=0x03FF, ChrData::Rom(rom)) => rom[address as usize - 0x0000 + self.chr_bank_offsets[0]],
+            (0x0400..=0x07FF, ChrData::Rom(rom)) => rom[address as usize - 0x0400 + self.chr_bank_offsets[1]],
+            (0x0800..=0x0BFF, ChrData::Rom(rom)) => rom[address as usize - 0x0800 + self.chr_bank_offsets[2]],
+            (0x0C00..=0x0FFF, ChrData::Rom(rom)) => rom[address as usize - 0x0C00 + self.chr_bank_offsets[3]],
+            (0x1000..=0x13FF, ChrData::Rom(rom)) => rom[address as usize - 0x1000 + self.chr_bank_offsets[4]],
+            (0x1400..=0x17FF, ChrData::Rom(rom)) => rom[address as usize - 0x1400 + self.chr_bank_offsets[5]],
+            (0x1800..=0x1BFF, ChrData::Rom(rom)) => rom[address as usize - 0x1800 + self.chr_bank_offsets[6]],
+            (0x1C00..=0x1FFF, ChrData::Rom(rom)) => rom[address as usize - 0x1C00 + self.chr_bank_offsets[7]],
+            (0x2000..=0x3EFF, _) => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
                 debug!("Read {:04X} mirrored to {:04X}", address, mirrored_address);
 
                 self.ppu_vram[mirrored_address as usize]
             }
-            0x3F00..=0x3FFF => panic!("Shouldn't be reading from palette RAM through cartridge bus"),
+            (0x3F00..=0x3FFF, _) => panic!("Shouldn't be reading from palette RAM through cartridge bus"),
             _ => panic!("Reading from {:04X} invalid for CHR address bus", address),
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+    fn write_byte(&mut self, address: u16, value: u8, cycles: u32) {
         debug!("MMC3 CHR write {:04X}={:02X}", address, value);
+        self.update_a12(address, cycles);
 
         match address {
-            0x0000..=0x1FFF => (),
+            0x0000..=0x1FFF => {
+                if let ChrData::Ram(ram) = &mut self.chr_data {
+                    match address {
+                        0x0000..=0x03FF => ram[address as usize - 0x0000 + self.chr_bank_offsets[0]] = value,
+                        0x0400..=0x07FF => ram[address as usize - 0x0400 + self.chr_bank_offsets[1]] = value,
+                        0x0800..=0x0BFF => ram[address as usize - 0x0800 + self.chr_bank_offsets[2]] = value,
+                        0x0C00..=0x0FFF => ram[address as usize - 0x0C00 + self.chr_bank_offsets[3]] = value,
+                        0x1000..=0x13FF => ram[address as usize - 0x1000 + self.chr_bank_offsets[4]] = value,
+                        0x1400..=0x17FF => ram[address as usize - 0x1400 + self.chr_bank_offsets[5]] = value,
+                        0x1800..=0x1BFF => ram[address as usize - 0x1800 + self.chr_bank_offsets[6]] = value,
+                        0x1C00..=0x1FFF => ram[address as usize - 0x1C00 + self.chr_bank_offsets[7]] = value,
+                        _ => panic!(),
+                    }
+                }
+            }
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
 
@@ -274,10 +344,16 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
                     info!("MMC3 mirroring mode change {:?}", self.mirroring_mode);
                 }
             }
-            // IRQ Latch & IRQ Reload registers - TODO - Implement IRQ counter
-            0xC000..=0xDFFF => {}
-            // IRQ Disable/Enable registers - TODO - Implement IRQ counter
-            0xE000..=0xFFFF => {}
+            // IRQ Latch & IRQ Reload registers
+            0xC000..=0xDFFF => {
+                if address & 1 == 0 {
+                    self.irq_latch = value;
+                } else {
+                    self.reload_irq_next_rising_edge = true;
+                }
+            }
+            // IRQ Disable/Enable registers
+            0xE000..=0xFFFF => self.irq_enabled = address & 1 == 1,
             _ => (),
         }
     }
@@ -298,11 +374,10 @@ pub(crate) fn from_header(
             header.prg_rom_16kb_units * 2,
             Some([0; 0x2000]),
         )),
-        Box::new(MMC3ChrChip::new(
-            chr_rom.unwrap(),
-            header.chr_rom_8kb_units * 4,
-            header.mirroring,
-        )),
+        Box::new(match chr_rom {
+            None => MMC3ChrChip::new(ChrData::Ram(Box::new([0; 0x2000])), 8, header.mirroring),
+            Some(rom) => MMC3ChrChip::new(ChrData::Rom(rom), header.chr_rom_8kb_units * 4, header.mirroring),
+        }),
         header,
     )
 }

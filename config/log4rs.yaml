@@ -15,7 +15,7 @@ appenders:
       pattern: "{m}{n}"
 
 root:
-  level: error
+  level: info
 
 loggers:
   rust_nes::cpu:

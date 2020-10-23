@@ -140,6 +140,7 @@ impl InternalRegisters {
 }
 
 pub(crate) struct Ppu {
+    total_cycles: u32,
     scanline_state: ScanlineState,
     sprite_data: SpriteData,
     palette_ram: PaletteRam,
@@ -159,6 +160,7 @@ pub(crate) struct Ppu {
 impl Ppu {
     pub(super) fn new(chr_address_bus: Box<dyn PpuCartridgeAddressBus>) -> Self {
         Ppu {
+            total_cycles: 0,
             scanline_state: ScanlineState {
                 scanline: 0,
                 nametable_byte: 0,
@@ -195,7 +197,11 @@ impl Ppu {
         }
     }
 
-    pub(crate) fn dump_state(&self, vram_copy: &mut [u8; 0x4000]) -> &[u8; 0x100] {
+    pub(crate) fn check_trigger_irq(&mut self) -> bool {
+        self.chr_address_bus.check_trigger_irq()
+    }
+
+    pub(crate) fn dump_state(&mut self, vram_copy: &mut [u8; 0x4000]) -> &[u8; 0x100] {
         for i in 0..=0x3FFF {
             vram_copy[i] = self.read_byte(i as u16);
         }
@@ -328,12 +334,16 @@ impl Ppu {
     }
 
     /// Reads from the PPU address space
-    fn read_byte(&self, address: u16) -> u8 {
-        debug_assert!(address <= 0x3FFF);
+    fn read_byte(&mut self, address: u16) -> u8 {
+        debug_assert!(
+            address <= 0x3FFF,
+            "PPU address space is 14 bit wide, access attempted at {:04X}",
+            address
+        );
         //debug!("PPU address space read {:04X}", address);
 
         match address {
-            0x0000..=0x3EFF => self.chr_address_bus.read_byte(address),
+            0x0000..=0x3EFF => self.chr_address_bus.read_byte(address, self.total_cycles),
             0x3F00..=0x3FFF => self.palette_ram.read_byte(address),
             _ => panic!("Invalid address for PPU {:04X}", address),
         }
@@ -349,7 +359,7 @@ impl Ppu {
         debug!("PPU address space write: {:04X}={:02X}", address, value);
 
         match address {
-            0x0000..=0x3EFF => self.chr_address_bus.write_byte(address, value, 0),
+            0x0000..=0x3EFF => self.chr_address_bus.write_byte(address, value, self.total_cycles),
             0x3F00..=0x3FFF => {
                 self.palette_ram.write_byte(address, value);
             }
@@ -604,6 +614,9 @@ impl Iterator for Ppu {
             self.scanline_state.next_cycle()
         }
 
+        // Track total PPU cycles for components which need to know. Bit sketchy here that it wraps
+        self.total_cycles = self.total_cycles.wrapping_add(1);
+
         None // PPU never exits by itself
     }
 }
@@ -616,7 +629,11 @@ mod ppu_tests {
     struct FakeCartridge {}
 
     impl PpuCartridgeAddressBus for FakeCartridge {
-        fn read_byte(&self, _: u16) -> u8 {
+        fn check_trigger_irq(&mut self) -> bool {
+            false
+        }
+
+        fn read_byte(&mut self, _: u16, _: u32) -> u8 {
             0x0
         }
 

@@ -41,14 +41,22 @@ impl From<ZipError> for CartridgeError {
 
 /// A trait representing the CPU address bus into the cartridge
 pub(crate) trait CpuCartridgeAddressBus {
+    /// Read from the 16 bit CPU address bus
     fn read_byte(&self, address: u16) -> u8;
+    /// Write to the 16 bit CPU address bus
     fn write_byte(&mut self, address: u16, value: u8, cycles: u32);
 }
 
-/// A trait representing the CPU address bus into the cartridge
+/// A trait representing the PPU address bus into the cartridge
 pub(crate) trait PpuCartridgeAddressBus {
-    fn read_byte(&self, address: u16) -> u8;
+    /// Certain mappers can trigger an IRQ based on scanline counting (MMC3)
+    /// This function allows the CPU to poll and request state on whether an IRQ is ready to fire.
+    fn check_trigger_irq(&mut self) -> bool;
+    /// Read from the 14 bit PPU address bus
+    fn read_byte(&mut self, address: u16, cycles: u32) -> u8;
+    /// Write to the 14 bit PPU address bus
     fn write_byte(&mut self, address: u16, value: u8, cycles: u32);
+    /// Write to the 16 bit CPU address bus, required to set mapper registers
     fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: u32);
 }
 

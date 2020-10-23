@@ -15,6 +15,10 @@ log = "0.4.11"
 log4rs = "1.0.0-alpha-2"
 zip = "0.5.8"
 
+[profile.release]
+opt-level = 3
+debug = 2
+
 [[bin]]
 name = "rust_nes"
 path = "src/main.rs"

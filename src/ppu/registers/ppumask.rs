@@ -30,7 +30,7 @@ impl PpuMask {
         self.show_sprites_left_side = value & 0b100 == 0b100;
         self.show_background = value & 0b1000 == 0b1000;
         self.show_sprites = value & 0b1_0000 == 0b1_0000;
-        self.emphasize_red = value & 0b10_0000 == 0b10_0000;
+        self.emphasize_red = value & 0b10_0000 == 0b10_0000; // TODO - Actually use these masks!
         self.emphasize_green = value & 0b100_0000 == 0b100_0000;
         self.emphasize_blue = value & 0b1000_0000 == 0b1000_0000;
     }

@@ -147,6 +147,8 @@ pub(crate) struct Ppu {
     ppu_ctrl: PpuCtrl,
     ppu_mask: PpuMask,
     ppu_status: PpuStatus,
+    last_ppu_status_read_cycle: u32,
+    nmi_set_cycle: u32,
     internal_registers: InternalRegisters,
     ppu_data_buffer: u8,   // Internal buffer returned on PPUDATA reads
     last_written_byte: u8, // Stores the value last written onto the latch - TODO implement decay over time
@@ -180,6 +182,8 @@ impl Ppu {
             ppu_ctrl: PpuCtrl::new(),
             ppu_mask: PpuMask::new(),
             ppu_status: PpuStatus::new(),
+            last_ppu_status_read_cycle: 0,
+            nmi_set_cycle: 0,
             internal_registers: InternalRegisters {
                 vram_addr: 0,
                 temp_vram_addr: 0,
@@ -233,7 +237,12 @@ impl Ppu {
 
         match address {
             0x2000 => {
-                // PPUCTRL
+                // PPUCTRL - Setting NMI enable during vblank from low to high will immediately cause an NMI
+                if !self.ppu_ctrl.nmi_enable && value & 0b1000_0000 != 0 && self.ppu_status.vblank_started {
+                    self.trigger_nmi = true;
+                    self.nmi_set_cycle = self.total_cycles;
+                    info!("Triggering NMI");
+                }
                 self.ppu_ctrl.write_byte(value);
                 self.internal_registers.temp_vram_addr =
                     (self.internal_registers.temp_vram_addr & 0xF3FF) | ((value & 0b11) as u16) << 10;
@@ -302,7 +311,12 @@ impl Ppu {
             0x2000 => self.last_written_byte,
             0x2001 => self.last_written_byte,
             0x2002 => {
+                // Suppress NMI if it was triggered within the last 2 PPU cycles
+                if self.trigger_nmi && self.nmi_set_cycle >= self.total_cycles - 2 {
+                    self.trigger_nmi = false;
+                }
                 self.internal_registers.write_toggle = false;
+                self.last_ppu_status_read_cycle = self.total_cycles;
                 self.ppu_status.read(self.last_written_byte)
             }
             0x2003 => self.last_written_byte,
@@ -597,12 +611,16 @@ impl Iterator for Ppu {
             240..=260 => {
                 // PPU in idle state during scanline 240 and during VBlank except for triggering NMI
                 if self.scanline_state.scanline_cycle == 1 && self.scanline_state.scanline == 241 {
-                    self.ppu_status.vblank_started = true;
-
-                    // Trigger a NMI as both vblank flag and nmi enabled are pulled up
-                    if self.ppu_ctrl.nmi_enable {
-                        self.trigger_nmi = true;
-                        info!("Triggering NMI");
+                    if self.last_ppu_status_read_cycle != self.total_cycles {
+                        self.ppu_status.vblank_started = true;
+                        // Trigger a NMI as both vblank flag and nmi enabled are pulled up
+                        if self.ppu_ctrl.nmi_enable {
+                            self.trigger_nmi = true;
+                            self.nmi_set_cycle = self.total_cycles;
+                            info!("Triggering NMI");
+                        }
+                    } else {
+                        info!("Skipping NMI because PPUSTATUS read was 1 cycle ago");
                     }
                 }
             }

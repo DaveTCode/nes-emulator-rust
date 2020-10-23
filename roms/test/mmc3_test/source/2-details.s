@@ -9,7 +9,7 @@ main:
 	ldx #255
 	jsr begin_counter_test
 	ldx #255
-	jsr clock_counter_x
+	jsr clock_counter_x ; first clock loads with 255
 	jsr should_be_clear
 	jsr clock_counter
 	jsr should_be_set
@@ -58,10 +58,19 @@ main:
 	jsr clear_counter
 	jsr should_be_clear
 	
+	set_test 7,"IRQ should be set when non-zero and reloading to 0 after clear"
+	ldx #3
+	jsr begin_counter_test
+	jsr clock_counter   ; 3
+	jsr clock_counter   ; 2
 	lda #0
-	;jsr clear_vram
+	jsr set_reload
+	jsr clear_counter
+	jsr clock_counter   ; 0
+	jsr should_be_set
+	
 	jsr clear_oam
-	set_test 7,"Counter should be clocked 241 times in PPU frame"
+	set_test 8,"Counter should be clocked 241 times in PPU frame"
 	ldx #241
 	jsr begin_counter_test
 	jsr wait_vbl

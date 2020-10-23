@@ -140,3 +140,64 @@ wait_vbl:
 :       bit PPUSTATUS
 	bpl :-
 :       rts
+
+
+.macro check_ppu_region_ Len
+				; Delays since VBL began
+	jsr wait_vbl_optional   ; 10 average
+	delay Len - 18 - 200
+	lda PPUSTATUS           ; 4
+	bmi @ok                 ; 2
+	delay 200
+	; Next VBL should roughly begin here if it's the
+	; one we are detecting
+	delay 200
+	lda PPUSTATUS           ; 2
+	bpl @ok
+.endmacro
+
+check_ppu_region:
+	
+.ifndef REGION_FREE
+.ifdef PAL_ONLY
+	check_ppu_region_ 29781
+	print_str {newline,"Note: This test is meant for PAL NES only.",newline,newline}
+.endif
+
+.ifdef NTSC_ONLY
+	check_ppu_region_ 33248
+	print_str {newline,"Note: This test is meant for NTSC NES only.",newline,newline}
+.endif
+.endif
+@ok:    rts
+
+
+; Loads ASCII font into CHR RAM and fills rest with $FF
+.macro load_chr_ram
+	bit PPUSTATUS
+	setb PPUADDR,0
+	setb PPUADDR,0
+	
+	; Copy ascii_chr to 0
+	setb addr,<ascii_chr
+	ldx #>ascii_chr
+	ldy #0
+@page:
+	stx addr+1
+:       lda (addr),y
+	sta PPUDATA
+	iny
+	bne :-
+	inx
+	cpx #>ascii_chr_end
+	bne @page
+	
+	; Fill rest
+	lda #$FF
+:       sta PPUDATA
+	iny
+	bne :-
+	inx
+	cpx #$20
+	bne :-
+.endmacro

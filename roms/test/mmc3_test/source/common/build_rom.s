@@ -1,6 +1,6 @@
 ; Builds program as iNES ROM
 
-; Default is 16K PRG and 8K CHR ROM, NROM (0)
+; Default is 32K PRG and 8K CHR ROM, NROM (0)
 
 .if 0 ; Options to set before .include "shell.inc":
 CHR_RAM=1       ; Use CHR-RAM instead of CHR-ROM
@@ -61,8 +61,7 @@ CUSTOM_MAPPER=n ; Specify mapper number
 	NEED_CONSOLE=1
 .endif
 
-; Move code to $C000
-.segment "DMC"
+.segment "CODE"
 	.res $4000
 
 .include "shell.s"
@@ -75,7 +74,7 @@ std_reset:
 
 init_runtime:
 	.ifdef CHR_RAM
-		load_ascii_chr
+		load_chr_ram
 	.endif
 	rts
 

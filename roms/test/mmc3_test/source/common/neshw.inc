@@ -1,11 +1,5 @@
 ; NES I/O locations and masks
 
-; Clocks per second
-.ifndef CLOCK_RATE
-	CLOCK_RATE = 1789773 ; NTSC
-;       CLOCK_RATE = 1662607 ; PAL
-.endif
-
 .ifndef BUILD_NSF
 
 ; PPU
@@ -36,8 +30,27 @@ SNDMODE = $4017
 
 SNDMODE_NOIRQ   = $40
 
-.if CLOCK_RATE = 1789773
+.ifndef REGION_FREE
+	.ifndef PAL_ONLY
+		.ifndef NTSC_ONLY
+			NTSC_ONLY = 1
+		.endif
+	.endif
+.else
+	.ifdef NTSC_ONLY
+		.error "NTSC_ONLY and REGION_FREE defined"
+	.endif
+	.ifdef PAL_ONLY
+		.error "PAL_ONLY and REGION_FREE defined"
+	.endif
+.endif
+
+.ifdef NTSC_ONLY
+	CLOCK_RATE = 1789773
 	PPU_FRAMELEN = 29781
-.elseif CLOCK_RATE = 1662607
+.endif
+
+.ifdef PAL_ONLY
+	CLOCK_RATE = 1662607
 	PPU_FRAMELEN = 33248
 .endif

@@ -29,8 +29,7 @@ set_test_:
 
 
 ; Initializes testing module
-init_testing:
-	jmp init_crc
+init_testing = init_crc
 
 
 ; Reports that all tests passed

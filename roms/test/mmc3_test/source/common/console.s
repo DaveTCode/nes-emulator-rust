@@ -1,13 +1,10 @@
-; Scrolling text console with line wrapping, 30x29 characters.
-; Buffers lines for speed. Will work even if PPU doesn't
-; support scrolling (until text reaches bottom). Keeps border
-; along bottom in case TV cuts it off.
+; Scrolling text console with word wrapping, 30x29 characters.
 ;
-; Defers most initialization until first newline, at which
-; point it clears nametable and makes palette non-black.
-;
-; ** ASCII font must already be in CHR, and mirroring
-; must be vertical or single-screen.
+; * Defers PPU initialization until first flush/ newline.
+; * Works even if PPU doesn't support scrolling.
+; * Keeps border around edge of screen for TV overscan.
+; * Requires vertical or single-screen mirroring.
+; * Requires ASCII font in CHR.
 
 .ifndef CONSOLE_COLOR
 	CONSOLE_COLOR = $30     ; white
@@ -51,7 +48,7 @@ console_hide:
 
 
 ; Shows console display
-; Preserved: X, Y
+; Preserved: A, X, Y
 console_show:
 	pha
 	lda #CONSOLE_COLOR

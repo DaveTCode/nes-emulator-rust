@@ -64,22 +64,33 @@ print_hex:
 	lsr a
 	lsr a
 	lsr a
-	jsr @nibble
+	jsr print_nibble_
 	pla
 	
 	pha
 	and #$0F
-	jsr @nibble
+	jsr print_nibble_
 	pla
 	rts
 	
-@nibble:
+print_nibble_:
 	cmp #10
 	blt @digit
 	adc #6;+1 since carry is set
 @digit: adc #'0'
 	jmp print_char_
 
+
+; Prints low 4 bits of A as single hex character
+; Preserved: A, X, Y
+print_nibble:
+	pha
+	and #$0F
+	jsr update_crc
+	jsr print_nibble_
+	pla
+	rts
+	
 
 ; Prints character and updates checksum UNLESS
 ; it's a newline.
@@ -176,6 +187,7 @@ inc_addr:
 print_dec:
 	pha
 	sta print_temp_
+	jsr update_crc
 	txa
 	pha
 	lda print_temp_

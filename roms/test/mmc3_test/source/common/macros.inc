@@ -167,3 +167,22 @@
 		; -1
 	inx ; 2
 .endmacro
+
+; Negates A and adds it to operand
+.macro subaf Operand
+	eor #$FF
+	sec
+	adc Operand
+.endmacro
+
+; Initializes CPU registers to reasonable values
+.macro init_cpu_regs
+	sei
+	cld     ; unnecessary on NES, but might help on clone
+	ldx #$FF
+	txs
+	.ifndef BUILD_NSF
+		inx
+		stx PPUCTRL
+	.endif
+.endmacro

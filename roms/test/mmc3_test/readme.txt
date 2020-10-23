@@ -3,6 +3,47 @@ NES MMC3 Tests
 These tests verify a small part of MMC3 (and some MMC6) behavior, mostly
 related to the scanline counter and IRQ. They should be run in order.
 
+The ROMs mainly test behavior by manually clocking the MMC3's IRQ
+counter by writing to $2006 to change the current VRAM address. The last
+two ROMs test behavior that differs among MMC3 chips.
+
+
+MMC3 Operation
+--------------
+I have fairly thoroughly tested MMC3 IRQ counter operation and found the
+following behaviors that differ as described in kevtris's (draft?) MMC3
+documentation:
+
+- The counter can be clocked manually via bit 12 of the VRAM address
+even when $2000 = $00 (bg and sprites both use tiles from $0xxx).
+
+- The IRQ flag is not set when the counter is cleared by writing to
+$C001.
+
+- I uncovered some pathological behavior that isn't covered by the test
+ROMs. If $C001 is written, the counter clocked, then $C001 written
+again, on the next counter clock the counter will be ORed with $80
+(revision B)/frozen (revision A) and neither decremented nor reloaded.
+If $C001 is written again at this point, on the next counter clock it
+will be reloaded normally. I put a check in my emulator and none of the
+several games I tested ever caused this situation to occur, so it's
+probably not a good idea to implement this.
+
+The MMC3 in Crystalis (referred to here as revision A) worked as
+described in kevtris's document, with the above changes. The MMC3 in
+Super Mario Bros. 3 and Mega Man 3 (I think revision B, but I don't have
+the special screw driver) further differed when $C000 was written with
+0:
+
+- Writing 0 to $C000 works no differently than any other value written;
+it will cause the counter to be reloaded every time it is clocked (once
+it reaches zero).
+
+- When the counter is clocked, if it's not zero, it is decremented,
+otherwise it is reloaded with the last value written to $C000. *After*
+decrementing/reloading, if the counter is zero and IRQ is enabled via
+$E001, the IRQ flag is set.
+
 
 Multi-tests
 -----------

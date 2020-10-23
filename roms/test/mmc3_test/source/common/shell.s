@@ -1,4 +1,4 @@
-; Common routines and runtime
+; Shell that sets up testing framework and calls main
 
 ; Detect inclusion loops (otherwise ca65 goes crazy)
 .ifdef SHELL_INCLUDED
@@ -6,8 +6,6 @@
 	.end
 .endif
 SHELL_INCLUDED = 1
-
-;**** Special globals ****
 
 ; Temporary variables that ANY routine might modify, so
 ; only use them between routine calls.
@@ -17,26 +15,19 @@ temp3  = <$C
 addr   = <$E
 ptr = addr
 
-.segment "NVRAM"
-	; Beginning of variables not cleared at startup
-	nvram_begin:
+; Move code from $C000 to $E200, to accommodate my devcarts
+.segment "CODE"
+	.res $2200
+	
+; Put shell code after user code, so user code is in more
+; consistent environment
+.segment "CODE2"
 
-;****  Code segment setup ****
-
-.segment "RODATA"
 	; Any user code which runs off end might end up here,
 	; so catch that mistake.
 	nop ; in case there was three-byte opcode before this
 	nop
 	jmp internal_error
-
-; Move code to $E200 ($200 bytes for text output)
-.segment "DMC"
-	.res $2200
-
-; Devcart corrupts byte at $E000 when powering off
-.segment "CODE"
-	nop
 
 ;**** Common routines ****
 
@@ -47,31 +38,6 @@ ptr = addr
 .include "crc.s"
 .include "testing.s"
 
-.ifdef NEED_CONSOLE
-	.include "console.s"
-.else
-	; Stubs so code doesn't have to care whether
-	; console exists
-	console_init:
-	console_show:
-	console_hide:
-	console_print:
-	console_flush:
-		rts
-.endif
-
-.ifndef CUSTOM_PRINT
-	.include "text_out.s"
-	
-	print_char_:
-		jsr write_text_out
-		jmp console_print
-	
-	stop_capture:
-		rts
-	
-.endif
-	
 ;**** Shell core ****
 
 .ifndef CUSTOM_RESET
@@ -83,16 +49,14 @@ ptr = addr
 
 ; Sets up hardware then runs main
 run_shell:
-	sei
-	cld     ; unnecessary on NES, but might help on clone
-	ldx #$FF
-	txs
+	init_cpu_regs
+	
 	jsr init_shell
 	set_test $FF
 	jmp run_main
 
 
-; Initializes shell
+; Initializes shell without affecting current set_test values
 init_shell:
 	jsr clear_ram
 	jsr init_wait_vbl     ; waits for VBL once here,
@@ -125,6 +89,15 @@ pre_main:
 	jsr clear_oam
 .endif
 	
+	; Clear APU registers
+	lda #0
+	sta $4015
+	ldx #$13
+:   sta $4000,x
+	dex
+	bpl :-
+	
+	; CPU registers
 	lda #$34
 	pha
 	lda #0
@@ -142,21 +115,14 @@ pre_main:
 
 ; Reports result and ends program
 std_exit:
-	sei
-	cld
-	ldx #$FF
-	txs
-	pha
-	
+	sta temp
+	init_cpu_regs
 	setb SNDCHN,0
-	.ifndef BUILD_NSF
-		setb PPUCTRL,0
-	.endif
+	lda temp
 	
-	pla
-	pha
 	jsr report_result
-	;jsr clear_nvram ; TODO: was this needed for anything?
+	pha
+	jsr check_ppu_region
 	pla
 	jmp post_exit
 
@@ -187,202 +153,28 @@ report_result:
 
 ;**** Other routines ****
 
-; Reports internal error and exits program
-internal_error:
-	print_str newline,"Internal error"
-	lda #255
-	jmp exit
+.include "shell_misc.s"
 
-
-.import __NVRAM_LOAD__, __NVRAM_SIZE__
-
-; Clears $0-($100+S) and nv_ram_end-$7FF
-clear_ram:
-	lda #0
-	
-	; Main pages
-	tax
-:   sta 0,x
-	sta $300,x
-	sta $400,x
-	sta $500,x
-	sta $600,x
-	sta $700,x
-	inx
-	bne :-
-	
-	; Stack except that above stack pointer
-	tsx
-	inx
-:   dex
-	sta $100,x
-	bne :-
-	
-	; BSS except nvram
-	ldx #<__NVRAM_SIZE__
-:   sta __NVRAM_LOAD__,x
-	inx
-	bne :-
-	
-	rts
-
-
-; Clears nvram
-clear_nvram:
-	ldx #<__NVRAM_SIZE__
-	beq @empty
-	lda #0
-:   dex
-	sta __NVRAM_LOAD__,x
-	bne :-
-@empty:
-	rts
-
-
-; Prints filename and newline, if available, otherwise nothing.
-; Preserved: A, X, Y
-print_filename:
-	.ifdef FILENAME_KNOWN
-		pha
-		jsr print_newline
-		setw addr,filename
-		jsr print_str_addr
-		jsr print_newline
-		pla
-	.endif
-	rts
-	
-.pushseg
-.segment "RODATA"
-	; Filename terminated with zero byte.
-	filename:
-		.ifdef FILENAME_KNOWN
-			.incbin "ram:nes_temp"
-		.endif
-		.byte 0
-.popseg
-
-
-;**** ROM-specific ****
-.ifndef BUILD_NSF
-
-.include "ppu.s"
-
-avoid_silent_nsf:
-play_byte:
-	rts
-
-; Loads ASCII font into CHR RAM
-.macro load_ascii_chr
-	bit PPUSTATUS
-	setb PPUADDR,$00
-	setb PPUADDR,$00
-	setb addr,<ascii_chr
-	ldx #>ascii_chr
-	ldy #0
-@page:
-	stx addr+1
-:   lda (addr),y
-	sta PPUDATA
-	iny
-	bne :-
-	inx
-	cpx #>ascii_chr_end
-	bne @page
-.endmacro
-
-; Disables interrupts and loops forever
-.ifndef CUSTOM_FOREVER
-forever:
-	sei
-	lda #0
-	sta PPUCTRL
-:   beq :-
-	.res $10,$EA    ; room for code to run loader
-.endif
-
-
-; Default NMI
-.ifndef CUSTOM_NMI
-	zp_byte nmi_count
-	
-	nmi:
-		inc nmi_count
-		rti
-	
-	; Waits for NMI. Must be using NMI handler that increments
-	; nmi_count, with NMI enabled.
-	; Preserved: X, Y
-	wait_nmi:
-		lda nmi_count
-	:   cmp nmi_count
-		beq :-
+.ifdef NEED_CONSOLE
+	.include "console.s"
+.else
+	; Stubs so code doesn't have to care whether
+	; console exists
+	console_init:
+	console_show:
+	console_hide:
+	console_print:
+	console_flush:
 		rts
 .endif
 
-
-; Default IRQ
-.ifndef CUSTOM_IRQ
-	irq:
-		bit SNDCHN  ; clear APU IRQ flag
-		rti
+.ifndef CUSTOM_PRINT
+	.include "text_out.s"
+	
+	print_char_:
+		jsr write_text_out
+		jmp console_print
+	
+	stop_capture:
+		rts
 .endif
-
-.endif
-
-
-; Reports A in binary as high and low tones, with
-; leading low tone for reference. Omits leading
-; zeroes.
-; Preserved: A, X, Y
-play_hex:
-	pha
-	
-	; Make low reference beep
-	clc
-	jsr @beep
-	
-	; Remove high zero bits
-	sec
-:   rol a
-	bcc :-
-	
-	; Play remaining bits
-	beq @zero
-:   jsr @beep
-	asl a
-	bne :-
-@zero:
-
-	delay_msec 300
-	pla
-	rts
-
-; Plays low/high beep based on carry
-; Preserved: A, X, Y
-@beep:
-	pha
-	
-	; Set up square
-	lda #1
-	sta SNDCHN
-	sta $4001
-	sta $4003
-	adc #$FE    ; period=$100 if carry, $1FF if none
-	sta $4002
-	
-	; Fade volume
-	lda #$0F
-:   ora #$30
-	sta $4000
-	delay_msec 8
-	sec
-	sbc #$31
-	bpl :-
-	
-	; Silence
-	sta SNDCHN
-	delay_msec 160
-	
-	pla
-	rts

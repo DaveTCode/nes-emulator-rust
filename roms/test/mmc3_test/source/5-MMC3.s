@@ -1,7 +1,7 @@
 ; Tests MMC3-specifics
 
 .include "test_mmc3.inc"
-	
+
 main:
 	jsr begin_mmc3_tests
 	
@@ -9,13 +9,14 @@ main:
 	ldx #0
 	jsr begin_counter_test
 	jsr clock_counter       ; 0
+	jsr clock_counter       ; 0
 	jsr should_be_set
 	jsr clock_counter       ; 0
 	jsr should_be_set
 	jsr clock_counter       ; 0
 	jsr should_be_set
 	
-	set_test 3,"IRQ should be set when counter is 0 after reloading"
+	set_test 3,"IRQ should be set when counter is 0 after reloading, even when counter was 0 before reloading"
 	ldx #1
 	jsr begin_counter_test
 	jsr clock_counter       ; 1
@@ -26,6 +27,5 @@ main:
 	jsr clock_counter       ; 0
 	jsr should_be_set
 	
-		
 	jmp tests_passed
 

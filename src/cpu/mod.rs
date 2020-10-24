@@ -1,4 +1,4 @@
-mod interrupts;
+pub(crate) mod interrupts;
 mod opcodes;
 mod registers;
 mod status_flags;
@@ -129,8 +129,8 @@ impl<'a> Cpu<'a> {
         ppu: &'a mut Ppu,
     ) -> Self {
         // The processor starts at the RESET interrupt handler address
-        let pc = prg_address_bus.read_byte(Interrupt::RESET.offset()) as u16
-            | ((prg_address_bus.read_byte(Interrupt::RESET.offset().wrapping_add(1)) as u16) << 8);
+        let pc = prg_address_bus.read_byte(Interrupt::RESET(0).offset()) as u16
+            | ((prg_address_bus.read_byte(Interrupt::RESET(0).offset().wrapping_add(1)) as u16) << 8);
 
         Cpu {
             state: State::Cpu(CpuState::FetchOpcode),
@@ -419,7 +419,7 @@ impl<'a> Cpu<'a> {
             }
             InterruptState::PushStatusRegister(i) => {
                 self.push_to_stack(match i {
-                    Interrupt::IRQ_BRK => self.registers.status_register.bits() | 0b0011_0000,
+                    Interrupt::IRQ_BRK(_) => self.registers.status_register.bits() | 0b0011_0000,
                     _ => (self.registers.status_register.bits() | 0b0010_0000) & 0b1110_1111,
                 });
 
@@ -430,9 +430,8 @@ impl<'a> Cpu<'a> {
 
                 // Higher priority interrupts can override lower priority ones
                 // at this point, specifically an NMI can override a BRK/IRQ
-                if self.ppu.trigger_nmi {
-                    self.ppu.trigger_nmi = false;
-                    State::Interrupt(InterruptState::PullIRQVecHigh(Interrupt::NMI))
+                if let Some(interrupt) = self.ppu.consume_ppu_nmi() {
+                    State::Interrupt(InterruptState::PullIRQVecHigh(interrupt))
                 } else {
                     State::Interrupt(InterruptState::PullIRQVecHigh(i))
                 }
@@ -996,9 +995,8 @@ impl<'a> Cpu<'a> {
         if let State::Cpu(CpuState::FetchOpcode) = self.state {
             // Check for interrupts after completion of previous operation
             // BEFORE reading next opcode
-            if self.ppu.trigger_nmi {
-                self.ppu.trigger_nmi = false;
-                self.state = State::Interrupt(InterruptState::InternalOps1(Interrupt::NMI));
+            if let Some(interrupt) = self.ppu.consume_ppu_nmi() {
+                self.state = State::Interrupt(InterruptState::InternalOps1(interrupt));
 
                 info!("Starting NMI interrupt");
             } else if self.ppu.check_trigger_irq()
@@ -1007,7 +1005,7 @@ impl<'a> Cpu<'a> {
                     .status_register
                     .contains(StatusFlags::INTERRUPT_DISABLE_FLAG)
             {
-                self.state = State::Interrupt(InterruptState::InternalOps1(Interrupt::IRQ));
+                self.state = State::Interrupt(InterruptState::InternalOps1(Interrupt::IRQ(self.cycles * 3)));
 
                 info!("Starting IRQ interrupt triggered by PPU");
             } else if self.trigger_dma {

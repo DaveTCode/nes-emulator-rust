@@ -64,8 +64,8 @@ rom_tests! {
     ppu_vbl_nmi_01_basics: (0x4FF06A * 3 as usize, 3760518270, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("01-vbl_basics.nes")),
     ppu_vbl_nmi_02_vbl_set_time: (0x5BC105 * 3 as usize, 98639598, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("02-vbl_set_time.nes")),
     ppu_vbl_nmi_03_clear_time: (0x4DAAC6 * 3 as usize, 2257284403, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("03-vbl_clear_time.nes")),
-    // ppu_vbl_nmi_04_nmi_control: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("04-nmi_control.nes")), - Failed #11 - immediate occurrence after next instruction
-    // ppu_vbl_nmi_05_nmi_timing: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("05-nmi_timing.nes")), - Failed
+    ppu_vbl_nmi_04_nmi_control: (0x2621FA * 3 as usize, 1597701030, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("04-nmi_control.nes")),
+    ppu_vbl_nmi_05_nmi_timing: (0x6A4B9B * 3 as usize, 3525866603, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("05-nmi_timing.nes")),
     ppu_vbl_nmi_06_suppression: (0x6ABFF0 * 3 as usize, 3592094813, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("06-suppression.nes")),
     // ppu_vbl_nmi_07_nmi_on_timing: (0x4FF06A * 3 as usize, 2373747886, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("07-nmi_on_timing.nes")), - Failed
     ppu_vbl_nmi_08_nmi_off_timing: (0x6791A1 * 3 as usize, 2373747886, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("08-nmi_off_timing.nes")),
@@ -77,7 +77,7 @@ rom_tests! {
     vbl_nmi_timing_vbl_clear_timing: (0x3BF1E1 * 3 as usize, 1325590663, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("4.vbl_clear_timing.nes")),
     vbl_nmi_timing_nmi_suppression: (0x539313 * 3 as usize, 670688491, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("5.nmi_suppression.nes")),
     vbl_nmi_timing_nmi_disable: (0x3CDA89 * 3 as usize, 324384964, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("6.nmi_disable.nes")),
-    // vbl_nmi_timing_nmi_timing: (0x3C6634 * 3 as usize, 1325590663, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("7.nmi_timing.nes")), - TODO Failing #3
+    vbl_nmi_timing_nmi_timing: (0x3C6634 * 3 as usize, 4107311669, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("7.nmi_timing.nes")),
 
     // ----- Sprite Zero Hit Tests -----
     sprite_zero_hit_01_basics: (0x1DF406 * 3 as usize, 2445173019, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("01-basics.nes")),

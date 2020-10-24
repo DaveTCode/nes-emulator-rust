@@ -3,6 +3,7 @@ mod registers;
 mod sprites;
 
 use cartridge::PpuCartridgeAddressBus;
+use cpu::interrupts::Interrupt;
 use log::{debug, error, info};
 use ppu::palette::PaletteRam;
 use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
@@ -140,7 +141,7 @@ impl InternalRegisters {
 }
 
 pub(crate) struct Ppu {
-    total_cycles: u32,
+    pub(crate) total_cycles: u32,
     scanline_state: ScanlineState,
     sprite_data: SpriteData,
     palette_ram: PaletteRam,
@@ -148,12 +149,11 @@ pub(crate) struct Ppu {
     ppu_mask: PpuMask,
     ppu_status: PpuStatus,
     last_ppu_status_read_cycle: u32,
-    nmi_set_cycle: u32,
     internal_registers: InternalRegisters,
     ppu_data_buffer: u8,   // Internal buffer returned on PPUDATA reads
     last_written_byte: u8, // Stores the value last written onto the latch - TODO implement decay over time
     is_short_frame: bool,  // Every other frame the pre-render scanline takes one fewer cycle
-    pub(crate) trigger_nmi: bool,
+    nmi_interrupt: Option<Interrupt>,
     pub(crate) frame_buffer: [u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
     priorities: [u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
     pub(crate) chr_address_bus: Box<dyn PpuCartridgeAddressBus>,
@@ -183,7 +183,6 @@ impl Ppu {
             ppu_mask: PpuMask::new(),
             ppu_status: PpuStatus::new(),
             last_ppu_status_read_cycle: 0,
-            nmi_set_cycle: 0,
             internal_registers: InternalRegisters {
                 vram_addr: 0,
                 temp_vram_addr: 0,
@@ -194,7 +193,7 @@ impl Ppu {
             last_written_byte: 0x0,
             ppu_data_buffer: 0x0,
             is_short_frame: false,
-            trigger_nmi: false,
+            nmi_interrupt: None,
             frame_buffer: [0; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
             priorities: [0; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
             chr_address_bus,
@@ -211,6 +210,21 @@ impl Ppu {
         }
 
         &self.sprite_data.oam_ram
+    }
+
+    pub(crate) fn consume_ppu_nmi(&mut self) -> Option<Interrupt> {
+        if let Some(Interrupt::NMI(cycles)) = self.nmi_interrupt {
+            // Due to us checking for interrupts _after_ the last operation we might catch an interrupt
+            // a CPU instruction early (STA 2002 can cause an NMI, last cycle of STA is the write, should have
+            // checked for interrupts first but instead we check whether the interrupt occurred in the last 3 PPU
+            // cycles.
+            if cycles <= self.total_cycles - 3 {
+                self.nmi_interrupt = None;
+                return Some(Interrupt::NMI(cycles));
+            }
+        }
+
+        None
     }
 
     pub(crate) fn current_scanline(&self) -> u16 {
@@ -239,16 +253,17 @@ impl Ppu {
             0x2000 => {
                 // PPUCTRL - Setting NMI enable during vblank from low to high will immediately cause an NMI
                 if !self.ppu_ctrl.nmi_enable && value & 0b1000_0000 != 0 && self.ppu_status.vblank_started {
-                    self.trigger_nmi = true;
-                    self.nmi_set_cycle = self.total_cycles;
+                    self.nmi_interrupt = Some(Interrupt::NMI(self.total_cycles));
                     info!("Triggering NMI");
                 }
 
                 self.ppu_ctrl.write_byte(value);
 
                 // Setting NMI disabled within 1 cycle of triggering it will suppress as well
-                if !self.ppu_ctrl.nmi_enable && self.nmi_set_cycle >= self.total_cycles - 2 {
-                    self.trigger_nmi = false;
+                if let Some(Interrupt::NMI(cycles)) = self.nmi_interrupt {
+                    if !self.ppu_ctrl.nmi_enable && cycles >= self.total_cycles - 2 {
+                        self.nmi_interrupt = None;
+                    }
                 }
 
                 self.internal_registers.temp_vram_addr =
@@ -319,8 +334,14 @@ impl Ppu {
             0x2001 => self.last_written_byte,
             0x2002 => {
                 // Suppress NMI if it was triggered within the last 2 PPU cycles
-                if self.trigger_nmi && self.nmi_set_cycle >= self.total_cycles - 2 {
-                    self.trigger_nmi = false;
+                match self.nmi_interrupt {
+                    None => (),
+                    Some(Interrupt::NMI(cycles)) => {
+                        if cycles >= self.total_cycles - 2 {
+                            self.nmi_interrupt = None;
+                        }
+                    }
+                    Some(_) => panic!(),
                 }
                 self.internal_registers.write_toggle = false;
                 self.last_ppu_status_read_cycle = self.total_cycles;
@@ -623,8 +644,7 @@ impl Iterator for Ppu {
                         self.ppu_status.vblank_started = true;
                         // Trigger a NMI as both vblank flag and nmi enabled are pulled up
                         if self.ppu_ctrl.nmi_enable {
-                            self.trigger_nmi = true;
-                            self.nmi_set_cycle = self.total_cycles;
+                            self.nmi_interrupt = Some(Interrupt::NMI(self.total_cycles));
                             info!("Triggering NMI");
                         }
                     } else {

@@ -109,7 +109,7 @@ impl Opcode {
                     .set(StatusFlags::NEGATIVE_FLAG, operand.unwrap() & 0b1000_0000 != 0);
                 State::Cpu(CpuState::FetchOpcode)
             }
-            Operation::BRK => State::Interrupt(InterruptState::PushPCH(Interrupt::IRQ_BRK)),
+            Operation::BRK => State::Interrupt(InterruptState::PushPCH(Interrupt::IRQ_BRK(0))),
             Operation::CLC => {
                 cpu.registers.status_register.remove(StatusFlags::CARRY_FLAG);
                 State::Cpu(CpuState::FetchOpcode)

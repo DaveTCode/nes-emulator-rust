@@ -548,6 +548,7 @@ impl Ppu {
             self.ppu_status.sprite_zero_hit = false;
             self.frame_buffer.iter_mut().for_each(|m| *m = 0);
             self.priorities.iter_mut().for_each(|m| *m = 0);
+            self.sprite_data.clear_sprites();
         } else if (cycle >= 280) && (cycle <= 304) && self.ppu_mask.is_rendering_enabled() {
             // Repeatedly copy vertical bits from temp addr to real addr to reinitialise pre-render
             self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr & 0b1111_1011_1110_0000)

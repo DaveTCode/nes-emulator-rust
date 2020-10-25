@@ -153,15 +153,15 @@ impl super::Ppu {
     /// Returns the index into palette RAM based upon the current state of the sprite
     /// shift registers and latches
     /// Note: Also shift the high/low byte shift registers
-    pub(super) fn get_sprite_pixel(&mut self, cycle: u16) -> (u8, bool, bool) {
+    pub(super) fn get_sprite_pixel(&mut self, x: u32) -> (u8, bool, bool) {
         let mut found_pixel = false;
         let mut result = (0x0u8, false, false);
 
         for sprite_index in 0..MAX_SPRITES_PER_LINE {
             // Skip sprites which aren't yet visible on this line
             if !self.sprite_data.sprites[sprite_index].visible
-                || (self.sprite_data.sprites[sprite_index].x_location as u16 + 8) < cycle
-                || (self.sprite_data.sprites[sprite_index].x_location as u16) >= cycle
+                || (self.sprite_data.sprites[sprite_index].x_location as u32 + 8) <= x
+                || (self.sprite_data.sprites[sprite_index].x_location as u32) > x
             {
                 continue;
             }

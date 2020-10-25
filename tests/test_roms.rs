@@ -84,12 +84,12 @@ rom_tests! {
     sprite_zero_hit_02_alignment: (0x1DF406 * 3 as usize, 901509059, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("02-alignment.nes")),
     sprite_zero_hit_03_corners: (0x1DF406 * 3 as usize, 218094906, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("03-corners.nes")),
     sprite_zero_hit_04_flip: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("04-flip.nes")),
-    //sprite_zero_hit_05_left_clip: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("05-left_clip.nes")),
+    sprite_zero_hit_05_left_clip: (0x14DD6D * 3 as usize, 343554750, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("05-left_clip.nes")),
     sprite_zero_hit_06_right_edge: (0x1DF406 * 3 as usize, 2932966414, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("06-right_edge.nes")),
-    //sprite_zero_hit_07_screen_bottom: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("07-screen_bottom.nes")),
+    sprite_zero_hit_07_screen_bottom: (0x15C616 * 3 as usize, 1824463657, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("07-screen_bottom.nes")),
     sprite_zero_hit_08_double_height: (0x1DF406 * 3 as usize, 3281055842, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("08-double_height.nes")),
-    //sprite_zero_hit_09_timing: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("09-timing.nes")),
-    //sprite_zero_hit_10_timing_order: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("10-timing_order.nes")),
+    sprite_zero_hit_09_timing: (0x5BC0FC * 3 as usize, 1855578835, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("09-timing.nes")),
+    sprite_zero_hit_10_timing_order: (0x2450AB * 3 as usize, 2111091809, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("10-timing_order.nes")),
 
     // ----- Mapper Tests -----
     mapper_0_p32k_c8k_v: (0x56A32 * 3 as usize, 469175584, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_C8K_V.nes")),

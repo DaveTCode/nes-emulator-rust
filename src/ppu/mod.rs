@@ -530,8 +530,11 @@ impl Ppu {
             let (sprite_pixel, sprite_priority_over_bg, is_sprite_zero) =
                 match (self.ppu_mask.show_sprites, self.ppu_mask.show_sprites_left_side, x) {
                     (false, _, _) => (0x0, false, false),
-                    (true, false, 0..=7) => (0x0, false, false),
-                    _ => self.get_sprite_pixel(cycle),
+                    (true, false, 0..=7) => {
+                        self.get_sprite_pixel(x); // Throwaway read to force a register shift for relevant sprites even if the left side is masked
+                        (0x0, false, false)
+                    }
+                    _ => self.get_sprite_pixel(x),
                 };
 
             if is_sprite_zero && (sprite_pixel & 0b11) != 0 && (bg_pixel & 0b11) != 0 && x != 0xFF {
@@ -564,12 +567,14 @@ impl Ppu {
     }
 
     fn handle_prerender_scanline_cycle(&mut self, cycle: u16) {
-        if cycle == 1 {
-            self.ppu_status.vblank_started = false;
+        if cycle == 0 {
+            self.ppu_status.sprite_overflow = false;
             self.ppu_status.sprite_zero_hit = false;
             self.frame_buffer.iter_mut().for_each(|m| *m = 0);
             self.priorities.iter_mut().for_each(|m| *m = 0);
             self.sprite_data.clear_sprites();
+        } else if cycle == 1 {
+            self.ppu_status.vblank_started = false;
         } else if (cycle >= 280) && (cycle <= 304) && self.ppu_mask.is_rendering_enabled() {
             // Repeatedly copy vertical bits from temp addr to real addr to reinitialise pre-render
             self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr & 0b1111_1011_1110_0000)

@@ -118,6 +118,12 @@ impl SpriteData {
         }
     }
 
+    pub(super) fn clear_sprites(&mut self) {
+        for sprite in &mut self.sprites {
+            sprite.visible = false;
+        }
+    }
+
     pub(super) fn write_oam_addr(&mut self, value: u8) {
         self.oam_addr = value;
     }
@@ -138,6 +144,7 @@ impl SpriteData {
     }
 
     pub(super) fn dma_write(&mut self, value: u8, dma_byte: u8) {
+        // Note that OAM DMA doesn't affect oam_addr
         self.oam_ram[self.oam_addr.wrapping_add(dma_byte) as usize] = value;
     }
 }
@@ -205,9 +212,8 @@ impl super::Ppu {
             self.sprite_data.oam_addr = 0;
         }
 
-        match scanline {
-            0..=239 | 261 => self.process_frame_cycle(scanline, cycle, sprite_height, pattern_table_base),
-            _ => (),
+        if let 0..=239 = scanline {
+            self.process_frame_cycle(scanline, cycle, sprite_height, pattern_table_base)
         }
     }
 
@@ -290,13 +296,8 @@ impl super::Ppu {
                 debug_assert!(cycle >= 65 && cycle <= 256);
                 if (self.sprite_data.oam_addr as usize) < self.sprite_data.oam_ram.len() {
                     let value = self.sprite_data.oam_ram[self.sprite_data.oam_addr as usize];
-                    self.sprite_data.oam_addr += 1;
 
-                    if self.sprite_data.oam_addr as usize == self.sprite_data.oam_ram.len() - 1 {
-                        SpriteState::Waiting
-                    } else {
-                        SpriteState::SpriteEvaluation(SpriteEvaluation::WriteByte { count, value })
-                    }
+                    SpriteState::SpriteEvaluation(SpriteEvaluation::WriteByte { count, value })
                 } else {
                     SpriteState::Waiting
                 }
@@ -309,9 +310,13 @@ impl super::Ppu {
                 }
 
                 // TODO - Somewhere here we need to consider whether to set the sprite overflow flag
-                if count == 3 {
+                if (self.sprite_data.oam_addr as usize) == self.sprite_data.oam_ram.len() - 1 {
+                    SpriteState::Waiting
+                } else if count == 3 {
+                    self.sprite_data.oam_addr += 1;
                     SpriteState::SpriteEvaluation(SpriteEvaluation::ReadY)
                 } else {
+                    self.sprite_data.oam_addr += 1;
                     SpriteState::SpriteEvaluation(SpriteEvaluation::ReadByte { count: count + 1 })
                 }
             }

@@ -150,7 +150,7 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
 
         match address {
             0x6000..=0x7FFF => {
-                if let Some(mut ram) = self.prg_ram {
+                if let Some(ram) = &mut self.prg_ram {
                     if self.prg_ram_enabled {
                         // TODO - some variants of MMC1 always have RAM enabled
                         ram[(address - 0x6000) as usize] = value;

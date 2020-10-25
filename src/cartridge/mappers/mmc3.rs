@@ -98,7 +98,7 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
         match address {
             0x6000..=0x7FFF => {
-                if let Some(mut ram) = self.prg_ram {
+                if let Some(ram) = &mut self.prg_ram {
                     ram[(address - 0x6000) as usize] = value
                 }
             }

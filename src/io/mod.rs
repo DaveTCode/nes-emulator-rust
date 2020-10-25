@@ -8,7 +8,7 @@ pub(crate) enum Controller {
 }
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) enum Button {
     A,
     B,

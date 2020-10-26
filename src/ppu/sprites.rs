@@ -278,6 +278,16 @@ impl super::Ppu {
 
                     if (self.sprite_data.oam_addr as usize + 1) < self.sprite_data.oam_ram.len() {
                         self.sprite_data.oam_addr += 1;
+
+                        // Check for sprite overflow
+                        if self.sprite_data.secondary_oam_ram_pointer >= self.sprite_data.secondary_oam_ram.len() {
+                            error!(
+                                "Cycles: {} SOAM: {:?}",
+                                self.total_cycles, self.sprite_data.secondary_oam_ram
+                            );
+                            self.ppu_status.sprite_overflow = true;
+                        }
+
                         SpriteState::SpriteEvaluation(SpriteEvaluation::ReadByte { count: 1 })
                     } else {
                         SpriteState::Waiting
@@ -286,6 +296,15 @@ impl super::Ppu {
                     // Skip to the next sprite, this one doesn't overlap
                     if (self.sprite_data.oam_addr as usize + 4) < self.sprite_data.oam_ram.len() {
                         self.sprite_data.oam_addr += 4;
+
+                        // Sprite overflow bug, increment oam_addr once too many when sprite doesn't overlap
+                        if self.sprite_data.secondary_oam_ram_pointer >= self.sprite_data.secondary_oam_ram.len() {
+                            if self.sprite_data.oam_addr & 3 == 3 {
+                                self.sprite_data.oam_addr -= 4;
+                            }
+                            self.sprite_data.oam_addr += 1;
+                        }
+
                         SpriteState::SpriteEvaluation(SpriteEvaluation::ReadY)
                     } else {
                         SpriteState::Waiting

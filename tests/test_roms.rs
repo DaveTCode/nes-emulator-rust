@@ -104,10 +104,10 @@ rom_tests! {
     mapper_0_p32k_cr32k_v: (0x270AAB * 3 as usize, 3621921473, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR32K_V.nes")),
     // mapper_1_no_chrom: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K.nes")), - 0003 output (bad CHR somehow)
     mapper_1_p128k_c32k: (0x48189 * 3 as usize, 1806907890, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K.nes")),
-    mapper_1_p128k_c32k_s8k: (0x48189 * 3 as usize, 3832425217, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_S8K.nes")),
+    mapper_1_p128k_c32k_s8k: (0x38C38C * 3 as usize, 2193233876, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_S8K.nes")),
     mapper_1_p128k_c32k_w8k: (0x48189 * 3 as usize, 1806907890, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_W8K.nes")),
     mapper_1_p128k_c128k: (0x48189 * 3 as usize, 2153594427, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K.nes")),
-    mapper_1_p128k_c128k_s8k: (0x48189 * 3 as usize, 2193233876, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_S8K.nes")),
+    mapper_1_p128k_c128k_s8k: (0x3937E0 * 3 as usize, 3832425217, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_S8K.nes")),
     mapper_1_p128k_c128k_w8k: (0x48189 * 3 as usize, 2153594427, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_W8K.nes")),
     mapper_2_p128k_cr8k_v: (0x253959 * 3 as usize, 1058817094, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_CR8K_V.nes")),
     mapper_2_p128k_v: (0x24C505 * 3 as usize, 3178533875, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),

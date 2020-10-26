@@ -5,10 +5,8 @@ pub(super) const MAX_SPRITES_PER_LINE: usize = 8;
 
 #[derive(Debug, Copy, Clone)]
 enum SpriteState {
-    ClearingSecondaryOam { pointer: usize, even_cycle: bool },
     SpriteEvaluation(SpriteEvaluation),
     SpriteFetch(SpriteFetch),
-    Waiting,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -17,6 +15,7 @@ enum SpriteEvaluation {
     WriteY { y: u8 },
     ReadByte { count: u8 },
     WriteByte { count: u8, value: u8 },
+    Completed,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -51,6 +50,7 @@ enum SpriteFetch {
         value: u8,
         is_high_byte: bool,
     },
+    Completed,
 }
 
 #[derive(Debug, Clone)]
@@ -91,7 +91,8 @@ pub(super) struct SpriteData {
     sprites: Vec<Sprite>,
     /// Internal representation of the pointer into secondary OAM RAM, reflects how many sprites have been copied
     secondary_oam_ram_pointer: usize,
-    state: SpriteState,
+    eval_state: SpriteEvaluation,
+    fetch_state: SpriteFetch,
 }
 
 impl SpriteData {
@@ -114,7 +115,8 @@ impl SpriteData {
             secondary_oam_ram: [0xFF; MAX_SPRITES_PER_LINE * 4],
             sprites: vec![default_sprite; 8],
             secondary_oam_ram_pointer: 0,
-            state: SpriteState::Waiting,
+            eval_state: SpriteEvaluation::ReadY,
+            fetch_state: SpriteFetch::ReadY { sprite_index: 0 },
         }
     }
 
@@ -133,12 +135,9 @@ impl SpriteData {
         self.oam_addr = self.oam_addr.wrapping_add(1);
     }
 
-    pub(super) fn read_oam_data(&self) -> u8 {
-        match self.state {
-            SpriteState::ClearingSecondaryOam {
-                pointer: _,
-                even_cycle: _,
-            } => 0xFF,
+    pub(super) fn read_oam_data(&self, cycle: u16) -> u8 {
+        match cycle {
+            0..=64 => 0xFF,
             _ => self.oam_ram[self.oam_addr as usize],
         }
     }
@@ -201,73 +200,55 @@ impl super::Ppu {
         sprite_height: u8,
         pattern_table_base: u16,
     ) {
-        // First cycle is always NOOP, so use it to initialize the sprite data state machine
-        if cycle == 0 {
-            self.sprite_data.state = initialise_state_machine_for_scanline(scanline);
-            return;
-        } else if cycle == 257 {
-            self.sprite_data.oam_addr = 0;
-            self.sprite_data.state = SpriteState::SpriteFetch(SpriteFetch::ReadY { sprite_index: 0 });
-        } else if cycle > 257 && cycle <= 320 {
-            self.sprite_data.oam_addr = 0;
-        }
-
         if let 0..=239 = scanline {
             self.process_frame_cycle(scanline, cycle, sprite_height, pattern_table_base)
         }
     }
 
     fn process_frame_cycle(&mut self, scanline: u16, cycle: u16, sprite_height: u8, pattern_table_base: u16) {
-        self.sprite_data.state = match self.sprite_data.state {
-            SpriteState::ClearingSecondaryOam { pointer, even_cycle } => {
-                debug_assert!(cycle >= 1 && cycle <= 64, "{:}", cycle);
-                let new_index = if even_cycle {
-                    self.sprite_data.secondary_oam_ram[pointer] = 0xFF;
-                    pointer + 1
-                } else {
-                    pointer
-                };
-
-                if cycle == 64 {
-                    self.sprite_data.secondary_oam_ram_pointer = 0;
-                    SpriteState::SpriteEvaluation(SpriteEvaluation::ReadY)
-                } else {
-                    SpriteState::ClearingSecondaryOam {
-                        pointer: new_index,
-                        even_cycle: !even_cycle,
-                    }
+        match cycle {
+            0 => self.sprite_data.secondary_oam_ram_pointer = 0,
+            // Clear secondary OAM RAM
+            1..=64 => {
+                if cycle & 1 == 0 {
+                    self.sprite_data.secondary_oam_ram[self.sprite_data.secondary_oam_ram_pointer] = 0xFF;
+                    self.sprite_data.secondary_oam_ram_pointer += 1;
                 }
             }
-            SpriteState::SpriteEvaluation(eval_state) => {
-                self.step_sprite_eval_machine(eval_state, scanline, cycle, sprite_height)
+            // Sprite evaluation
+            65..=256 => {
+                if cycle == 65 {
+                    self.sprite_data.secondary_oam_ram_pointer = 0;
+                    self.sprite_data.eval_state = SpriteEvaluation::ReadY;
+                }
+                self.step_sprite_eval_machine(scanline, sprite_height)
             }
-            SpriteState::SpriteFetch(fetch_state) => {
-                self.step_sprite_fetch_machine(fetch_state, scanline, cycle, sprite_height, pattern_table_base)
+            // Sprite fetch
+            257..=320 => {
+                if cycle == 257 {
+                    self.sprite_data.fetch_state = SpriteFetch::ReadY { sprite_index: 0 };
+                }
+                self.sprite_data.oam_addr = 0;
+                self.step_sprite_fetch_machine(scanline, sprite_height, pattern_table_base)
             }
-            SpriteState::Waiting => SpriteState::Waiting,
+            // Read from secondary OAM RAM (but not tracking that read anywhere atm)
+            321..=340 => (),
+            _ => panic!("Shouldn't be calling sprite handler at dot {}", cycle),
         };
     }
 
-    fn step_sprite_eval_machine(
-        &mut self,
-        state: SpriteEvaluation,
-        scanline: u16,
-        cycle: u16,
-        sprite_height: u8,
-    ) -> SpriteState {
-        match state {
+    fn step_sprite_eval_machine(&mut self, scanline: u16, sprite_height: u8) {
+        self.sprite_data.eval_state = match self.sprite_data.eval_state {
             SpriteEvaluation::ReadY => {
-                debug_assert!(cycle >= 65 && cycle <= 256);
                 if (self.sprite_data.oam_addr as usize) < self.sprite_data.oam_ram.len() {
-                    SpriteState::SpriteEvaluation(SpriteEvaluation::WriteY {
+                    SpriteEvaluation::WriteY {
                         y: self.sprite_data.oam_ram[self.sprite_data.oam_addr as usize],
-                    })
+                    }
                 } else {
-                    SpriteState::Waiting
+                    SpriteEvaluation::Completed
                 }
             }
             SpriteEvaluation::WriteY { y } => {
-                debug_assert!(cycle >= 65 && cycle <= 256);
                 if self.sprite_data.secondary_oam_ram_pointer < self.sprite_data.secondary_oam_ram.len() {
                     self.sprite_data.secondary_oam_ram[self.sprite_data.secondary_oam_ram_pointer] = y;
                 }
@@ -281,16 +262,12 @@ impl super::Ppu {
 
                         // Check for sprite overflow
                         if self.sprite_data.secondary_oam_ram_pointer >= self.sprite_data.secondary_oam_ram.len() {
-                            error!(
-                                "Cycles: {} SOAM: {:?}",
-                                self.total_cycles, self.sprite_data.secondary_oam_ram
-                            );
                             self.ppu_status.sprite_overflow = true;
                         }
 
-                        SpriteState::SpriteEvaluation(SpriteEvaluation::ReadByte { count: 1 })
+                        SpriteEvaluation::ReadByte { count: 1 }
                     } else {
-                        SpriteState::Waiting
+                        SpriteEvaluation::Completed
                     }
                 } else {
                     // Skip to the next sprite, this one doesn't overlap
@@ -305,81 +282,70 @@ impl super::Ppu {
                             self.sprite_data.oam_addr += 1;
                         }
 
-                        SpriteState::SpriteEvaluation(SpriteEvaluation::ReadY)
+                        SpriteEvaluation::ReadY
                     } else {
-                        SpriteState::Waiting
+                        SpriteEvaluation::Completed
                     }
                 }
             }
             SpriteEvaluation::ReadByte { count } => {
-                debug_assert!(cycle >= 65 && cycle <= 256);
                 if (self.sprite_data.oam_addr as usize) < self.sprite_data.oam_ram.len() {
                     let value = self.sprite_data.oam_ram[self.sprite_data.oam_addr as usize];
 
-                    SpriteState::SpriteEvaluation(SpriteEvaluation::WriteByte { count, value })
+                    SpriteEvaluation::WriteByte { count, value }
                 } else {
-                    SpriteState::Waiting
+                    SpriteEvaluation::Completed
                 }
             }
             SpriteEvaluation::WriteByte { count, value } => {
-                debug_assert!(cycle >= 65 && cycle <= 256);
                 if self.sprite_data.secondary_oam_ram_pointer < self.sprite_data.secondary_oam_ram.len() {
                     self.sprite_data.secondary_oam_ram[self.sprite_data.secondary_oam_ram_pointer] = value;
                     self.sprite_data.secondary_oam_ram_pointer += 1;
                 }
 
-                // TODO - Somewhere here we need to consider whether to set the sprite overflow flag
-                if (self.sprite_data.oam_addr as usize) == self.sprite_data.oam_ram.len() - 1 {
-                    SpriteState::Waiting
+                if (self.sprite_data.oam_addr as usize) >= self.sprite_data.oam_ram.len() - 1 {
+                    SpriteEvaluation::Completed
                 } else if count == 3 {
                     self.sprite_data.oam_addr += 1;
-                    SpriteState::SpriteEvaluation(SpriteEvaluation::ReadY)
+                    SpriteEvaluation::ReadY
                 } else {
                     self.sprite_data.oam_addr += 1;
-                    SpriteState::SpriteEvaluation(SpriteEvaluation::ReadByte { count: count + 1 })
+                    SpriteEvaluation::ReadByte { count: count + 1 }
                 }
             }
-        }
+            SpriteEvaluation::Completed => SpriteEvaluation::Completed,
+        };
     }
 
     /// This part of the sprite fetch pipeline does the following
     /// Fetch Y, Tile, Attr, X from Secondary OAM (4 cycles)
     /// Fetch tile from PPU whilst refetching X from secondary OAM (4 cycles)
-    fn step_sprite_fetch_machine(
-        &mut self,
-        state: SpriteFetch,
-        scanline: u16,
-        cycle: u16,
-        sprite_height: u8,
-        pattern_table_base: u16,
-    ) -> SpriteState {
-        debug_assert!(cycle >= 257 && cycle <= 320);
-
-        match state {
-            SpriteFetch::ReadY { sprite_index } => SpriteState::SpriteFetch(SpriteFetch::ReadTile {
+    fn step_sprite_fetch_machine(&mut self, scanline: u16, sprite_height: u8, pattern_table_base: u16) {
+        self.sprite_data.fetch_state = match self.sprite_data.fetch_state {
+            SpriteFetch::ReadY { sprite_index } => SpriteFetch::ReadTile {
                 sprite_index,
                 y: self.sprite_data.secondary_oam_ram[sprite_index * 4],
-            }),
-            SpriteFetch::ReadTile { sprite_index, y } => SpriteState::SpriteFetch(SpriteFetch::ReadAttr {
+            },
+            SpriteFetch::ReadTile { sprite_index, y } => SpriteFetch::ReadAttr {
                 sprite_index,
                 y,
                 tile: self.sprite_data.secondary_oam_ram[sprite_index * 4 + 1],
-            }),
+            },
             SpriteFetch::ReadAttr { sprite_index, y, tile } => {
                 self.sprite_data.sprites[sprite_index]
                     .attribute_latch
                     .set(self.sprite_data.secondary_oam_ram[sprite_index * 4 + 2]);
-                SpriteState::SpriteFetch(SpriteFetch::ReadX { sprite_index, y, tile })
+                SpriteFetch::ReadX { sprite_index, y, tile }
             }
             SpriteFetch::ReadX { sprite_index, y, tile } => {
                 self.sprite_data.sprites[sprite_index].x_location =
                     self.sprite_data.secondary_oam_ram[sprite_index * 4 + 3];
-                SpriteState::SpriteFetch(SpriteFetch::FetchByte {
+                SpriteFetch::FetchByte {
                     sprite_index,
                     y,
                     tile,
                     is_high_byte: false,
-                })
+                }
             }
             SpriteFetch::FetchByte {
                 sprite_index,
@@ -416,13 +382,13 @@ impl super::Ppu {
                     value = value.reverse_bits();
                 }
 
-                SpriteState::SpriteFetch(SpriteFetch::WriteByte {
+                SpriteFetch::WriteByte {
                     sprite_index,
                     y,
                     tile,
                     value,
                     is_high_byte,
-                })
+                }
             }
             SpriteFetch::WriteByte {
                 sprite_index,
@@ -437,29 +403,19 @@ impl super::Ppu {
                 };
 
                 match (sprite_index, is_high_byte) {
-                    (7, _) => SpriteState::Waiting,
-                    (_, false) => SpriteState::SpriteFetch(SpriteFetch::FetchByte {
+                    (7, _) => SpriteFetch::Completed,
+                    (_, false) => SpriteFetch::FetchByte {
                         sprite_index,
                         y,
                         tile,
                         is_high_byte: true,
-                    }),
-                    (_, true) => SpriteState::SpriteFetch(SpriteFetch::ReadY {
+                    },
+                    (_, true) => SpriteFetch::ReadY {
                         sprite_index: sprite_index + 1,
-                    }),
+                    },
                 }
             }
-        }
-    }
-}
-
-fn initialise_state_machine_for_scanline(scanline: u16) -> SpriteState {
-    if scanline == 261 {
-        SpriteState::Waiting
-    } else {
-        SpriteState::ClearingSecondaryOam {
-            pointer: 0,
-            even_cycle: false,
+            SpriteFetch::Completed => SpriteFetch::Completed,
         }
     }
 }

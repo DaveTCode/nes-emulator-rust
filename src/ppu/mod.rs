@@ -348,7 +348,7 @@ impl Ppu {
                 self.ppu_status.read(self.last_written_byte)
             }
             0x2003 => self.last_written_byte,
-            0x2004 => self.sprite_data.read_oam_data(),
+            0x2004 => self.sprite_data.read_oam_data(self.scanline_state.scanline_cycle),
             0x2005 => self.last_written_byte,
             0x2006 => self.last_written_byte,
             0x2007 => {

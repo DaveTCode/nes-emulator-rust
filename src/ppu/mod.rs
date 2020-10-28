@@ -253,8 +253,11 @@ impl Ppu {
             0x2000 => {
                 // PPUCTRL - Setting NMI enable during vblank from low to high will immediately cause an NMI
                 if !self.ppu_ctrl.nmi_enable && value & 0b1000_0000 != 0 && self.ppu_status.vblank_started {
-                    self.nmi_interrupt = Some(Interrupt::NMI(self.total_cycles));
-                    info!("Triggering NMI");
+                    // Doesn't affect if vblank about to be turned off
+                    if self.scanline_state.scanline != 261 || self.scanline_state.scanline_cycle != 1 {
+                        self.nmi_interrupt = Some(Interrupt::NMI(self.total_cycles));
+                        info!("Triggering NMI");
+                    }
                 }
 
                 self.ppu_ctrl.write_byte(value);

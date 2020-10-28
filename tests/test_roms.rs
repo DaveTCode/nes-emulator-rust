@@ -47,7 +47,7 @@ rom_tests! {
     blargg_nes_ppu_test_vbl_clear_time: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("vbl_clear_time.nes")),
     blargg_nes_ppu_test_vram_access: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("vram_access.nes")),
     // ppu_open_bus: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_open_bus").join("ppu_open_bus.nes")), - Not working, claims because no decay
-    // ppu_read_buffer: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_read_buffer").join("test_ppu_read_buffer.nes")), - Crashes trying to read invalid address from PPU 2007
+    // ppu_read_buffer: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_read_buffer").join("test_ppu_read_buffer.nes")), - Fails on several counts, likely quite badly implemented read buffer
 
     // ----- DMA/DMC Specific Tests -----
     //dma_2007_read: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("dmc_dma_during_read4").join("dma_2007_read.nes")), - Fails, unclear why
@@ -67,7 +67,7 @@ rom_tests! {
     ppu_vbl_nmi_04_nmi_control: (0x2621FA * 3 as usize, 1597701030, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("04-nmi_control.nes")),
     ppu_vbl_nmi_05_nmi_timing: (0x6A4B9B * 3 as usize, 3525866603, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("05-nmi_timing.nes")),
     ppu_vbl_nmi_06_suppression: (0x6ABFF0 * 3 as usize, 3592094813, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("06-suppression.nes")),
-    // ppu_vbl_nmi_07_nmi_on_timing: (0x4FF06A * 3 as usize, 2373747886, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("07-nmi_on_timing.nes")), - Failed
+    ppu_vbl_nmi_07_nmi_on_timing: (0x5EEF57 * 3 as usize, 1516309785, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("07-nmi_on_timing.nes")),
     ppu_vbl_nmi_08_nmi_off_timing: (0x6791A1 * 3 as usize, 2373747886, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("08-nmi_off_timing.nes")),
     ppu_vbl_nmi_09_even_odd_frames: (0x43AB75 * 3 as usize, 817319831, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("09-even_odd_frames.nes")),
     // ppu_vbl_nmi_10_even_odd_timing: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("10-even_odd_timing.nes")), - Failed #3 Clock is skipped too late
@@ -102,7 +102,7 @@ rom_tests! {
     mapper_0_p32k_c8k_v: (0x56A32 * 3 as usize, 469175584, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_C8K_V.nes")),
     mapper_0_p32k_cr8k_v: (0x270AAB * 3 as usize, 3621921473, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR8K_V.nes")),
     mapper_0_p32k_cr32k_v: (0x270AAB * 3 as usize, 3621921473, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR32K_V.nes")),
-    // mapper_1_no_chrom: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K.nes")), - 0003 output (bad CHR somehow)
+    mapper_1_no_chrom: (0x56A32 * 3 as usize, 786314361, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K.nes")),
     mapper_1_p128k_c32k: (0x48189 * 3 as usize, 1806907890, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K.nes")),
     mapper_1_p128k_c32k_s8k: (0x38C38C * 3 as usize, 2193233876, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_S8K.nes")),
     mapper_1_p128k_c32k_w8k: (0x48189 * 3 as usize, 1806907890, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_W8K.nes")),

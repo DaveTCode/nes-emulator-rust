@@ -17,6 +17,8 @@ pub(crate) struct MMC3PrgChip {
     prg_rom: Vec<u8>,
     total_prg_banks: u8,
     prg_ram: Option<[u8; 0x2000]>,
+    prg_ram_readonly: bool,
+    prg_ram_disabled: bool,
     prg_banks: [u8; 4],
     prg_bank_offsets: [usize; 4],
     bank_mode: PRGBankMode,
@@ -32,6 +34,8 @@ impl MMC3PrgChip {
             prg_rom,
             total_prg_banks,
             prg_ram,
+            prg_ram_readonly: false,
+            prg_ram_disabled: false,
             prg_banks: [0, 1, total_prg_banks - 2, total_prg_banks - 1],
             prg_bank_offsets: [
                 0x0000,
@@ -69,7 +73,13 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x6000..=0x7FFF => match self.prg_ram {
-                Some(ram) => ram[(address - 0x6000) as usize],
+                Some(ram) => {
+                    if self.prg_ram_disabled {
+                        0x0 // TODO - Should be open bus
+                    } else {
+                        ram[(address - 0x6000) as usize]
+                    }
+                }
                 None => 0x0,
             },
             // PRG Bank 0 - Switchable or fixed to second to last bank
@@ -102,7 +112,9 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
         match address {
             0x6000..=0x7FFF => {
                 if let Some(ram) = &mut self.prg_ram {
-                    ram[(address - 0x6000) as usize] = value
+                    if !self.prg_ram_disabled && !self.prg_ram_readonly {
+                        ram[(address - 0x6000) as usize] = value
+                    }
                 }
             }
             // Bank select and Bank data registers
@@ -129,11 +141,18 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
                 _ => panic!(),
             },
             // Mirroring & PRG RAM Protect registers
-            0xA000..=0xBFFF => {}
-            // IRQ Latch & IRQ Reload registers
-            0xC000..=0xDFFF => {}
-            // IRQ Disable/Enable registers
-            0xE000..=0xFFFF => {}
+            0xA000..=0xBFFF => match address & 1 {
+                // Even addresses - Nametable mirroring handled by CHR bus
+                0 => {}
+                1 => {
+                    // Odd addresses - RAM disable/enable/readonly
+                    self.prg_ram_disabled = value & 0b1000_0000 == 0b1000_0000;
+                    self.prg_ram_readonly = value & 0b0100_0000 == 0b0100_0000;
+                }
+                _ => panic!(),
+            },
+            // IRQ registers - Handled by CHR bus
+            0xC000..=0xFFFF => {}
             _ => (),
         }
     }

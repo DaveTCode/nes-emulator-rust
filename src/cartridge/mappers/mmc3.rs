@@ -1,4 +1,3 @@
-use cartridge::mappers::mmc1::MMC1ChrChip;
 use cartridge::mappers::ChrData;
 use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
@@ -57,6 +56,8 @@ impl MMC3PrgChip {
             }
         };
 
+        self.prg_bank_offsets[1] = self.prg_banks[1] as usize * 0x2000;
+
         info!(
             "MMC3 PRG bank offsets updated {:?} -> {:?}",
             self.prg_banks, self.prg_bank_offsets
@@ -78,7 +79,7 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
             }
             // PRG Bank 1 - Switchable
             0xA000..=0xBFFF => {
-                let adj_addr = address as usize - 0x8000;
+                let adj_addr = address as usize - 0xA000;
                 self.prg_rom[adj_addr + self.prg_bank_offsets[1] as usize]
             }
             // PRG Bank 2 - Switchable or fixed to second to last bank (swaps with bank 0)
@@ -91,11 +92,13 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
                 let adj_addr = address as usize - 0xE000;
                 self.prg_rom[adj_addr + self.prg_bank_offsets[3] as usize]
             }
-            _ => 0x0, // TODO - Would like to understand what reads of 0x4025 e.g. do here.
+            _ => 0x0, // TODO - Would like to understand what reads of e.g. 0x4025 do here.
         }
     }
 
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        info!("CPU write to MMC3 PRG bus {:04X}={:02X}", address, value);
+
         match address {
             0x6000..=0x7FFF => {
                 if let Some(ram) = &mut self.prg_ram {
@@ -112,13 +115,12 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
                     } else {
                         PRGBankMode::HighBankSwappable
                     };
-
-                    self.update_bank_offsets();
                 }
+                // Odd addresses => Bank data register
                 1 => {
                     match self.bank_select {
                         0b110 => self.prg_banks[0] = value % self.total_prg_banks,
-                        0b111 => self.prg_banks[3] = value % self.total_prg_banks,
+                        0b111 => self.prg_banks[1] = value % self.total_prg_banks,
                         _ => (), // Do nothing with CHR registers here
                     };
 
@@ -128,9 +130,9 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
             },
             // Mirroring & PRG RAM Protect registers
             0xA000..=0xBFFF => {}
-            // IRQ Latch & IRQ Reload registers - TODO - Implement IRQ counter
+            // IRQ Latch & IRQ Reload registers
             0xC000..=0xDFFF => {}
-            // IRQ Disable/Enable registers - TODO - Implement IRQ counter
+            // IRQ Disable/Enable registers
             0xE000..=0xFFFF => {}
             _ => (),
         }
@@ -240,14 +242,23 @@ impl MMC3ChrChip {
 
 impl PpuCartridgeAddressBus for MMC3ChrChip {
     fn check_trigger_irq(&mut self) -> bool {
-        self.irq_triggered
+        let val = self.irq_triggered;
+        self.irq_triggered = false;
+        val
     }
 
     fn read_byte(&mut self, address: u16, cycles: u32) -> u8 {
         self.update_a12(address, cycles);
 
         match (address, &self.chr_data) {
-            (0x0000..=0x1FFF, ChrData::Ram(ram)) => ram[address as usize],
+            (0x0000..=0x03FF, ChrData::Ram(ram)) => ram[address as usize - 0x0000 + self.chr_bank_offsets[0]],
+            (0x0400..=0x07FF, ChrData::Ram(ram)) => ram[address as usize - 0x0400 + self.chr_bank_offsets[1]],
+            (0x0800..=0x0BFF, ChrData::Ram(ram)) => ram[address as usize - 0x0800 + self.chr_bank_offsets[2]],
+            (0x0C00..=0x0FFF, ChrData::Ram(ram)) => ram[address as usize - 0x0C00 + self.chr_bank_offsets[3]],
+            (0x1000..=0x13FF, ChrData::Ram(ram)) => ram[address as usize - 0x1000 + self.chr_bank_offsets[4]],
+            (0x1400..=0x17FF, ChrData::Ram(ram)) => ram[address as usize - 0x1400 + self.chr_bank_offsets[5]],
+            (0x1800..=0x1BFF, ChrData::Ram(ram)) => ram[address as usize - 0x1800 + self.chr_bank_offsets[6]],
+            (0x1C00..=0x1FFF, ChrData::Ram(ram)) => ram[address as usize - 0x1C00 + self.chr_bank_offsets[7]],
             (0x0000..=0x03FF, ChrData::Rom(rom)) => rom[address as usize - 0x0000 + self.chr_bank_offsets[0]],
             (0x0400..=0x07FF, ChrData::Rom(rom)) => rom[address as usize - 0x0400 + self.chr_bank_offsets[1]],
             (0x0800..=0x0BFF, ChrData::Rom(rom)) => rom[address as usize - 0x0800 + self.chr_bank_offsets[2]],
@@ -311,9 +322,8 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
                     } else {
                         CHRBankMode::HighBank2KB
                     };
-
-                    self.update_bank_offsets();
                 }
+                // Odd addresses => Bank data register
                 1 => {
                     match self.bank_select {
                         0b000 => {

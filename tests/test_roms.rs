@@ -112,8 +112,10 @@ rom_tests! {
     mapper_2_p128k_cr8k_v: (0x253959 * 3 as usize, 1058817094, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_CR8K_V.nes")),
     mapper_2_p128k_v: (0x24C505 * 3 as usize, 3178533875, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),
     mapper_3: (0x90CD6 * 3 as usize, 3952353136, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
-    // mapper_4_no_chrom: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")), - 2A13 output (all broken)
-    // mapper_4_p256k_c256k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")), - 0A10 output
+    // mapper_4_no_chrom: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")), - 2010 output (CHR RAM & PRG ROM fixed, others broken)
+    // mapper_4_p128k_cr8k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR8K.nes")), - 2010 output
+    // mapper_4_p128k_cr32k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR32K.nes")), - 2010 output
+    // mapper_4_p256k_c256k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")), - 2010 output
 
     // ----- MMC3 IRQ Tests -----
     //mmc3_irq_clocking: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("1-clocking.nes")), // Failed #3 - Doesn't handle PPUADDR causing changes

@@ -138,6 +138,17 @@ impl InternalRegisters {
             self.vram_addr = (self.vram_addr & !0x03E0) | (y << 5);
         }
     }
+
+    fn increment_vram_addr(&mut self, mode: &IncrementMode) {
+        match mode {
+            IncrementMode::Add1GoingAcross => {
+                self.vram_addr = (self.vram_addr + 1) & 0x3FFF;
+            }
+            IncrementMode::Add32GoingDown => {
+                self.vram_addr = (self.vram_addr + 32) & 0x3FFF;
+            }
+        };
+    }
 }
 
 pub(crate) struct Ppu {
@@ -311,16 +322,8 @@ impl Ppu {
             0x2007 => {
                 // PPUDATA
                 self.write_byte(self.internal_registers.vram_addr, value);
-                match self.ppu_ctrl.increment_mode {
-                    IncrementMode::Add1GoingAcross => {
-                        self.internal_registers.vram_addr = (self.internal_registers.vram_addr + 1) & 0x3FFF;
-                        // TODO - Does it wrap at 15 bits?
-                    }
-                    IncrementMode::Add32GoingDown => {
-                        self.internal_registers.vram_addr = (self.internal_registers.vram_addr + 32) & 0x3FFF;
-                        // TODO - Does it wrap at 15 bits?
-                    }
-                };
+                self.internal_registers
+                    .increment_vram_addr(&self.ppu_ctrl.increment_mode);
             }
             _ => panic!("Write to {:04X} not valid for PPU ({:02X})", address, value),
         }
@@ -362,16 +365,10 @@ impl Ppu {
                         value = self.palette_ram.read_byte(self.internal_registers.vram_addr);
                         self.read_byte(self.internal_registers.vram_addr - 0x1000)
                     }
-                    _ => panic!("Invalid address for PPU {:04X}", address),
+                    _ => panic!("Invalid address for PPU {:04X}", self.internal_registers.vram_addr),
                 };
-                match self.ppu_ctrl.increment_mode {
-                    IncrementMode::Add1GoingAcross => {
-                        self.internal_registers.vram_addr += 1; // TODO - Does it wrap at 15 bits?
-                    }
-                    IncrementMode::Add32GoingDown => {
-                        self.internal_registers.vram_addr += 32; // TODO - Does it wrap at 15 bits?
-                    }
-                };
+                self.internal_registers
+                    .increment_vram_addr(&self.ppu_ctrl.increment_mode);
                 value
             }
             _ => panic!("Read from {:04X} not valid for PPU", address),
@@ -596,7 +593,7 @@ impl Ppu {
 impl Iterator for Ppu {
     type Item = ();
 
-    fn next(&mut self) -> Option<()> {
+    fn next(&mut self) -> Option<Self::Item> {
         let mut trigger_cycle_skip = false;
 
         if self.scanline_state.scanline == 0 && self.scanline_state.scanline_cycle == 0 {

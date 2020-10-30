@@ -288,6 +288,8 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
         false
     }
 
+    fn update_vram_address(&mut self, _: u16, _: u32) {}
+
     fn read_byte(&mut self, address: u16, _: u32) -> u8 {
         match address {
             0x0000..=0x1FFF => {

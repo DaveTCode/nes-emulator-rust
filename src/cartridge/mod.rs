@@ -52,6 +52,9 @@ pub(crate) trait PpuCartridgeAddressBus {
     /// Certain mappers can trigger an IRQ based on scanline counting (MMC3)
     /// This function allows the CPU to poll and request state on whether an IRQ is ready to fire.
     fn check_trigger_irq(&mut self) -> bool;
+    /// Certain mappers can trigger an IRQ based on scanline counting (MMC3)
+    /// This function allows the mapper to listen on address bus changes
+    fn update_vram_address(&mut self, address: u16, ppu_cycles: u32);
     /// Read from the 14 bit PPU address bus
     fn read_byte(&mut self, address: u16, cycles: u32) -> u8;
     /// Write to the 14 bit PPU address bus

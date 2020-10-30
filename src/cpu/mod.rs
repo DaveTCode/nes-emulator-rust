@@ -201,7 +201,7 @@ impl<'a> Cpu<'a> {
             self.registers.stack_pointer,
             self.ppu.current_scanline_cycle(),
             self.ppu.current_scanline(),
-            self.cycles + 7 // TODO - Why do cycle counts start at 7? Startup process?
+            self.cycles + 8 // TODO - Why do cycle counts start at 7? Startup process?
         )
     }
 
@@ -999,11 +999,11 @@ impl<'a> Cpu<'a> {
                 self.state = State::Interrupt(InterruptState::InternalOps1(interrupt));
 
                 info!("Starting NMI interrupt");
-            } else if self.ppu.check_trigger_irq()
-                && !self
-                    .registers
-                    .status_register
-                    .contains(StatusFlags::INTERRUPT_DISABLE_FLAG)
+            } else if !self
+                .registers
+                .status_register
+                .contains(StatusFlags::INTERRUPT_DISABLE_FLAG)
+                && self.ppu.check_trigger_irq()
             {
                 self.state = State::Interrupt(InterruptState::InternalOps1(Interrupt::IRQ(self.cycles * 3)));
 
@@ -1044,7 +1044,7 @@ impl<'a> Cpu<'a> {
 impl<'a> Iterator for Cpu<'a> {
     type Item = ();
 
-    fn next(&mut self) -> Option<()> {
+    fn next(&mut self) -> Option<Self::Item> {
         // Check if we need to clock the CPU
         self.cpu_cycle_counter -= 1;
         if self.cpu_cycle_counter == 0 {

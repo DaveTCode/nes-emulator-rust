@@ -233,23 +233,42 @@ impl MMC3ChrChip {
     }
 
     fn clock_irq_counter(&mut self) {
-        if self.reload_irq_next_rising_edge {
+        debug!("Clocking IRQ counter {:02X}", self.irq_counter);
+        if self.reload_irq_next_rising_edge || self.irq_counter == 0 {
+            info!(
+                "MMC3 - Reloading IRQ counter (current {:02X}) {:02X}",
+                self.irq_counter, self.irq_latch
+            );
             self.irq_counter = self.irq_latch;
-        } else if self.irq_counter == 0 {
-            if self.irq_enabled {
-                self.irq_triggered = true;
-            }
-
-            self.irq_counter = self.irq_latch;
+            self.reload_irq_next_rising_edge = false;
         } else {
             self.irq_counter -= 1;
         }
+
+        if self.irq_counter == 0 && self.irq_enabled {
+            info!("Triggering MMC3 IRQ by counter hitting 0");
+            self.irq_triggered = true;
+        }
+    }
+}
+
+impl PpuCartridgeAddressBus for MMC3ChrChip {
+    fn check_trigger_irq(&mut self) -> bool {
+        let val = self.irq_triggered;
+
+        self.irq_triggered = false;
+
+        val
     }
 
-    fn update_a12(&mut self, address: u16, cycles: u32) {
-        self.a12_cycles_at_first_low = match (address & 0x1000 == 0x1000, self.a12_cycles_at_first_low) {
-            (false, None) => Some(cycles),
-            (false, Some(c)) => Some(c),
+    fn update_vram_address(&mut self, address: u16, ppu_cycles: u32) {
+        let cycle_diff = match self.a12_cycles_at_first_low {
+            None => None,
+            Some(c) => Some(ppu_cycles - c),
+        };
+
+        self.a12_cycles_at_first_low = match (address & 0x1000 == 0x1000, cycle_diff) {
+            (false, _) => Some(ppu_cycles),
             (true, Some(6..=u32::MAX)) => {
                 self.clock_irq_counter();
                 None
@@ -257,18 +276,8 @@ impl MMC3ChrChip {
             (true, _) => None,
         };
     }
-}
 
-impl PpuCartridgeAddressBus for MMC3ChrChip {
-    fn check_trigger_irq(&mut self) -> bool {
-        let val = self.irq_triggered;
-        self.irq_triggered = false;
-        val
-    }
-
-    fn read_byte(&mut self, address: u16, cycles: u32) -> u8 {
-        self.update_a12(address, cycles);
-
+    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
         match (address, &self.chr_data) {
             (0x0000..=0x03FF, ChrData::Ram(ram)) => ram[address as usize - 0x0000 + self.chr_bank_offsets[0]],
             (0x0400..=0x07FF, ChrData::Ram(ram)) => ram[address as usize - 0x0400 + self.chr_bank_offsets[1]],
@@ -297,10 +306,8 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, cycles: u32) {
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
         debug!("MMC3 CHR write {:04X}={:02X}", address, value);
-        self.update_a12(address, cycles);
-
         match address {
             0x0000..=0x1FFF => {
                 if let ChrData::Ram(ram) = &mut self.chr_data {
@@ -377,12 +384,23 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
             0xC000..=0xDFFF => {
                 if address & 1 == 0 {
                     self.irq_latch = value;
+                    info!("Setting IRQ latch value to {:02X}", value);
                 } else {
+                    self.irq_counter = 0;
+                    self.irq_triggered = false;
                     self.reload_irq_next_rising_edge = true;
+                    info!("Triggering manual reload of IRQ counter");
                 }
             }
             // IRQ Disable/Enable registers
-            0xE000..=0xFFFF => self.irq_enabled = address & 1 == 1,
+            0xE000..=0xFFFF => match address & 1 {
+                0 => {
+                    self.irq_enabled = false;
+                    self.irq_triggered = false;
+                }
+                1 => self.irq_enabled = true,
+                _ => panic!(),
+            },
             _ => (),
         }
     }

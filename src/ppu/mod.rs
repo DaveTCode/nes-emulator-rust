@@ -180,7 +180,7 @@ impl Ppu {
                 attribute_table_byte: 0,
                 bg_high_byte: 0,
                 bg_low_byte: 0,
-                scanline_cycle: 0,
+                scanline_cycle: 27, // Skip the startup sequence but correctly set the PPU cycles consumed during it
                 bg_shift_register_high: 0,
                 bg_shift_register_low: 0,
                 at_shift_register_high: 0,
@@ -315,6 +315,8 @@ impl Ppu {
                         self.internal_registers.temp_vram_addr =
                             (self.internal_registers.temp_vram_addr & 0xFF00) | value as u16;
                         self.internal_registers.vram_addr = self.internal_registers.temp_vram_addr;
+                        self.chr_address_bus
+                            .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
                     }
                 };
                 self.internal_registers.write_toggle = !self.internal_registers.write_toggle;
@@ -324,6 +326,8 @@ impl Ppu {
                 self.write_byte(self.internal_registers.vram_addr, value);
                 self.internal_registers
                     .increment_vram_addr(&self.ppu_ctrl.increment_mode);
+                self.chr_address_bus
+                    .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
             }
             _ => panic!("Write to {:04X} not valid for PPU ({:02X})", address, value),
         }
@@ -354,7 +358,9 @@ impl Ppu {
                 self.ppu_status.read(self.last_written_byte)
             }
             0x2003 => self.last_written_byte,
-            0x2004 => self.sprite_data.read_oam_data(self.scanline_state.scanline_cycle),
+            0x2004 => self
+                .sprite_data
+                .read_oam_data(self.scanline_state.scanline_cycle, self.ppu_mask.is_rendering_enabled()),
             0x2005 => self.last_written_byte,
             0x2006 => self.last_written_byte,
             0x2007 => {
@@ -432,11 +438,15 @@ impl Ppu {
 
                     // Go to the next tile every 8 dots
                     self.internal_registers.increment_effective_scroll_x();
+                    self.chr_address_bus
+                        .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
 
                     // Once per frame increment y to the next row
                     if cycle == 256 {
                         // Move to the next row of tiles at dot 256
                         self.internal_registers.increment_effective_scroll_y();
+                        self.chr_address_bus
+                            .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
                     }
                 }
             }
@@ -579,13 +589,8 @@ impl Ppu {
             // Repeatedly copy vertical bits from temp addr to real addr to reinitialise pre-render
             self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr & 0b1111_1011_1110_0000)
                 | (self.internal_registers.vram_addr & 0b0000_0100_0001_1111);
-
-            if cycle == 304 {
-                debug!(
-                    "Starting frame t={:04X} v={:04X}",
-                    self.internal_registers.temp_vram_addr, self.internal_registers.vram_addr
-                );
-            }
+            self.chr_address_bus
+                .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
         }
     }
 }
@@ -683,6 +688,8 @@ mod ppu_tests {
         fn check_trigger_irq(&mut self) -> bool {
             false
         }
+
+        fn update_vram_address(&mut self, _: u16, _: u32) {}
 
         fn read_byte(&mut self, _: u16, _: u32) -> u8 {
             0x0

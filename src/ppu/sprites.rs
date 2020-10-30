@@ -135,9 +135,9 @@ impl SpriteData {
         self.oam_addr = self.oam_addr.wrapping_add(1);
     }
 
-    pub(super) fn read_oam_data(&self, cycle: u16) -> u8 {
-        match cycle {
-            0..=64 => 0xFF,
+    pub(super) fn read_oam_data(&self, cycle: u16, rendering_enabled: bool) -> u8 {
+        match (cycle, rendering_enabled) {
+            (0..=64, true) => 0xFF, // Return FF whilst clearing secondary OAM RAM
             _ => self.oam_ram[self.oam_addr as usize],
         }
     }

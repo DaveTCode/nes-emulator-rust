@@ -179,7 +179,7 @@ pub(crate) struct MMC3ChrChip {
     /// Track the cycle on which we last noticed an A12 change to low
     /// It takes 6 cycles at low voltage before a high voltage causes a counter decrement
     /// This is set to 0 whenever we see A12 high, if it was >=6 then we trigger a count
-    a12_cycles_at_first_low: Option<u32>,
+    a12_cycles_at_last_low: Option<u32>,
     /// IRQ register holding the value to load into the counter on the next reload
     irq_latch: u8,
     /// Set on reload to note that on the next rising edge the counter will get reloaded with the IRQ latch
@@ -203,7 +203,7 @@ impl MMC3ChrChip {
             mirroring_mode,
             bank_mode: CHRBankMode::LowBank2KB,
             bank_select: 0,
-            a12_cycles_at_first_low: None,
+            a12_cycles_at_last_low: None,
             irq_latch: 0,
             reload_irq_next_rising_edge: false,
             irq_counter: 0,
@@ -233,7 +233,7 @@ impl MMC3ChrChip {
     }
 
     fn clock_irq_counter(&mut self) {
-        debug!("Clocking IRQ counter {:02X}", self.irq_counter);
+        info!("Clocking IRQ counter {:02X}", self.irq_counter);
         if self.reload_irq_next_rising_edge || self.irq_counter == 0 {
             info!(
                 "MMC3 - Reloading IRQ counter (current {:02X}) {:02X}",
@@ -262,18 +262,23 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
     }
 
     fn update_vram_address(&mut self, address: u16, ppu_cycles: u32) {
-        let cycle_diff = match self.a12_cycles_at_first_low {
+        let cycle_diff = match self.a12_cycles_at_last_low {
             None => None,
             Some(c) => Some(ppu_cycles - c),
         };
 
-        self.a12_cycles_at_first_low = match (address & 0x1000 == 0x1000, cycle_diff) {
+        info!(
+            "MMC3 notified of PPU ADDR change {:04X} at cycle {}",
+            address, ppu_cycles
+        );
+
+        self.a12_cycles_at_last_low = match (address & 0x1000 == 0x1000, cycle_diff) {
             (false, _) => Some(ppu_cycles),
             (true, Some(6..=u32::MAX)) => {
                 self.clock_irq_counter();
                 None
             }
-            (true, _) => None,
+            (true, _) => self.a12_cycles_at_last_low,
         };
     }
 

@@ -375,6 +375,8 @@ impl Ppu {
                 };
                 self.internal_registers
                     .increment_vram_addr(&self.ppu_ctrl.increment_mode);
+                self.chr_address_bus
+                    .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
                 value
             }
             _ => panic!("Read from {:04X} not valid for PPU", address),
@@ -438,15 +440,11 @@ impl Ppu {
 
                     // Go to the next tile every 8 dots
                     self.internal_registers.increment_effective_scroll_x();
-                    self.chr_address_bus
-                        .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
 
                     // Once per frame increment y to the next row
                     if cycle == 256 {
                         // Move to the next row of tiles at dot 256
                         self.internal_registers.increment_effective_scroll_y();
-                        self.chr_address_bus
-                            .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
                     }
                 }
             }
@@ -467,6 +465,8 @@ impl Ppu {
                 }
 
                 self.internal_registers.next_address = 0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
+                self.chr_address_bus
+                    .update_vram_address(self.internal_registers.next_address, self.total_cycles);
             }
             2 => {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
@@ -481,6 +481,8 @@ impl Ppu {
                         | (self.internal_registers.vram_addr & 0x0C00)
                         | ((self.internal_registers.vram_addr >> 4) & 0x38)
                         | ((self.internal_registers.vram_addr >> 2) & 0x07);
+                    self.chr_address_bus
+                        .update_vram_address(self.internal_registers.next_address, self.total_cycles);
                 }
             }
             4 => {
@@ -496,6 +498,8 @@ impl Ppu {
                     self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
                         + tile_index
                         + self.internal_registers.fine_y() as u16;
+                    self.chr_address_bus
+                        .update_vram_address(self.internal_registers.next_address, self.total_cycles);
                 }
             }
             6 => {
@@ -510,6 +514,8 @@ impl Ppu {
                         + tile_index
                         + self.internal_registers.fine_y() as u16
                         + 8;
+                    self.chr_address_bus
+                        .update_vram_address(self.internal_registers.next_address, self.total_cycles);
                 }
             }
             _ => panic!("Coding error, cycle {:}", cycle),

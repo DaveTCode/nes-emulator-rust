@@ -365,7 +365,10 @@ impl super::Ppu {
                         pattern_table_base,
                         is_high_byte,
                     ) {
-                        Some(address) => self.read_byte(address),
+                        Some(address) => {
+                            self.chr_address_bus.update_vram_address(address, self.total_cycles);
+                            self.read_byte(address)
+                        }
                         None => 0x0,
                     }
                 } else {

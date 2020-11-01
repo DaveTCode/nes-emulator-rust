@@ -326,8 +326,6 @@ impl Ppu {
                 self.write_byte(self.internal_registers.vram_addr, value);
                 self.internal_registers
                     .increment_vram_addr(&self.ppu_ctrl.increment_mode);
-                self.chr_address_bus
-                    .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
             }
             _ => panic!("Write to {:04X} not valid for PPU ({:02X})", address, value),
         }
@@ -375,8 +373,6 @@ impl Ppu {
                 };
                 self.internal_registers
                     .increment_vram_addr(&self.ppu_ctrl.increment_mode);
-                self.chr_address_bus
-                    .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
                 value
             }
             _ => panic!("Read from {:04X} not valid for PPU", address),
@@ -393,7 +389,10 @@ impl Ppu {
         //debug!("PPU address space read {:04X}", address);
 
         match address {
-            0x0000..=0x3EFF => self.chr_address_bus.read_byte(address, self.total_cycles),
+            0x0000..=0x3EFF => {
+                self.chr_address_bus.update_vram_address(address, self.total_cycles);
+                self.chr_address_bus.read_byte(address, self.total_cycles)
+            }
             0x3F00..=0x3FFF => self.palette_ram.read_byte(address),
             _ => panic!("Invalid address for PPU {:04X}", address),
         }
@@ -409,7 +408,10 @@ impl Ppu {
         debug!("PPU address space write: {:04X}={:02X}", address, value);
 
         match address {
-            0x0000..=0x3EFF => self.chr_address_bus.write_byte(address, value, self.total_cycles),
+            0x0000..=0x3EFF => {
+                self.chr_address_bus.update_vram_address(address, self.total_cycles);
+                self.chr_address_bus.write_byte(address, value, self.total_cycles);
+            }
             0x3F00..=0x3FFF => {
                 self.palette_ram.write_byte(address, value);
             }
@@ -465,31 +467,27 @@ impl Ppu {
                 }
 
                 self.internal_registers.next_address = 0x2000 | (self.internal_registers.vram_addr & 0x0FFF);
-                self.chr_address_bus
-                    .update_vram_address(self.internal_registers.next_address, self.total_cycles);
             }
             2 => {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.nametable_byte = self.read_byte(self.internal_registers.next_address);
                 } else {
-                    self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
+                    // TODO - Needs to be disabled to get MMC3 IRQ working??
+                    //self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
                 }
             }
             3 => {
-                if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
-                    self.internal_registers.next_address = 0x23C0
-                        | (self.internal_registers.vram_addr & 0x0C00)
-                        | ((self.internal_registers.vram_addr >> 4) & 0x38)
-                        | ((self.internal_registers.vram_addr >> 2) & 0x07);
-                    self.chr_address_bus
-                        .update_vram_address(self.internal_registers.next_address, self.total_cycles);
-                }
+                self.internal_registers.next_address = 0x23C0
+                    | (self.internal_registers.vram_addr & 0x0C00)
+                    | ((self.internal_registers.vram_addr >> 4) & 0x38)
+                    | ((self.internal_registers.vram_addr >> 2) & 0x07);
             }
             4 => {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.attribute_table_byte = self.read_byte(self.internal_registers.next_address);
                 } else {
-                    self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
+                    // TODO - Needs to be disabled to get MMC3 IRQ working??
+                    //self.read_byte(self.internal_registers.next_address); // Garbage attribute byte during sprite read & end of line fetches
                 }
             }
             5 => {
@@ -498,8 +496,6 @@ impl Ppu {
                     self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
                         + tile_index
                         + self.internal_registers.fine_y() as u16;
-                    self.chr_address_bus
-                        .update_vram_address(self.internal_registers.next_address, self.total_cycles);
                 }
             }
             6 => {
@@ -514,8 +510,6 @@ impl Ppu {
                         + tile_index
                         + self.internal_registers.fine_y() as u16
                         + 8;
-                    self.chr_address_bus
-                        .update_vram_address(self.internal_registers.next_address, self.total_cycles);
                 }
             }
             _ => panic!("Coding error, cycle {:}", cycle),
@@ -595,8 +589,6 @@ impl Ppu {
             // Repeatedly copy vertical bits from temp addr to real addr to reinitialise pre-render
             self.internal_registers.vram_addr = (self.internal_registers.temp_vram_addr & 0b1111_1011_1110_0000)
                 | (self.internal_registers.vram_addr & 0b0000_0100_0001_1111);
-            self.chr_address_bus
-                .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
         }
     }
 }
@@ -623,14 +615,12 @@ impl Iterator for Ppu {
                 if self.ppu_mask.is_rendering_enabled() {
                     self.fetch_data(self.scanline_state.scanline_cycle);
 
-                    if self.scanline_state.scanline != 261 {
-                        self.process_sprite_cycle(
-                            self.scanline_state.scanline,
-                            self.scanline_state.scanline_cycle,
-                            self.ppu_ctrl.sprite_size.pixels(),
-                            self.ppu_ctrl.sprite_tile_table_select,
-                        );
-                    }
+                    self.process_sprite_cycle(
+                        self.scanline_state.scanline,
+                        self.scanline_state.scanline_cycle,
+                        self.ppu_ctrl.sprite_size.pixels(),
+                        self.ppu_ctrl.sprite_tile_table_select,
+                    );
 
                     // Background registers shift on dots 2-256 322-337 inclusive EXCEPT on pre-render where they only shift during 322-337
                     if (self.scanline_state.scanline_cycle >= 2

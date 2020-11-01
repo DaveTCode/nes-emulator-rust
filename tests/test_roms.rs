@@ -112,17 +112,18 @@ rom_tests! {
     mapper_2_p128k_cr8k_v: (0x253959 * 3 as usize, 1058817094, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_CR8K_V.nes")),
     mapper_2_p128k_v: (0x24C505 * 3 as usize, 3178533875, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),
     mapper_3: (0x90CD6 * 3 as usize, 3952353136, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
-    // mapper_4_no_chrom: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")), - 0010 output (CHR RAM & PRG ROM fixed, others broken)
-    // mapper_4_p128k_cr8k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR8K.nes")), - 0010 output
-    // mapper_4_p128k_cr32k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR32K.nes")), - 0010 output
-    // mapper_4_p256k_c256k: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")), - 0010 output
+    mapper_4_no_chrom: (0x30213C * 3 as usize, 3944012330, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")),
+    mapper_4_p128k_cr8k: (0x277EF7 * 3 as usize, 1769737631, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR8K.nes")),
+     // TODO - Unconvinced, this claims 8KB CR but surely based on name it's 32KB, maybe I don't support higher than 8KB RAM on an MMC3 board?
+    mapper_4_p128k_cr32k: (0x28DBF4 * 3 as usize, 1769737631, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR32K.nes")),
+    mapper_4_p256k_c256k: (0xC3B1E * 3 as usize, 502837231, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")),
 
     // ----- MMC3 IRQ Tests -----
     mmc3_irq_clocking: (0x105218 * 3 as usize, 4185058565, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("1-clocking.nes")),
-    //mmc3_irq_details: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("2-details.nes")), // Failed #8 - not clocked the right number of times during frame
+    mmc3_irq_details: (0x113AC1 * 3 as usize, 1296344911, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("2-details.nes")),
     mmc3_irq_a12_clocking: (0x105218 * 3 as usize, 820133214, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("3-A12_clocking.nes")),
     //mmc3_irq_scanline_timing: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("4-scanline_timing.nes")), // Failed #14 - IRQ never occurred
-    mmc3_irq_mmc3: (0x163A62 * 3 as usize, 144123581, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("5-MMC3.nes")), // Failed #2 - Should reload and set IRQ every clock when reload is 0
+    mmc3_irq_mmc3: (0x163A62 * 3 as usize, 144123581, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("5-MMC3.nes")),
     //mmc3_irq_mmc3_alt: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("6-MMC3_alt.nes")), // Failed #2 - Don't think I support the MMC3 alternate board
 }
 

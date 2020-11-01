@@ -168,9 +168,9 @@ enum CHRBankMode {
 
 pub(crate) struct MMC3ChrChip {
     chr_data: ChrData,
-    total_chr_banks: u8,
+    total_chr_banks: u16,
     ppu_vram: [u8; 0x1000],
-    chr_banks: [u8; 8],
+    chr_banks: [u16; 8],
     chr_bank_offsets: [usize; 8],
     mirroring_mode: MirroringMode,
     bank_mode: CHRBankMode,
@@ -193,7 +193,7 @@ pub(crate) struct MMC3ChrChip {
 }
 
 impl MMC3ChrChip {
-    fn new(chr_data: ChrData, total_chr_banks: u8, mirroring_mode: MirroringMode) -> Self {
+    fn new(chr_data: ChrData, total_chr_banks: u16, mirroring_mode: MirroringMode) -> Self {
         MMC3ChrChip {
             chr_data,
             total_chr_banks,
@@ -358,14 +358,16 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
                 1 => {
                     match self.bank_select {
                         0b000 => {
-                            self.chr_banks[0] = (value & 0b1111_1110) % self.total_chr_banks;
+                            self.chr_banks[0] = (value as u16 & 0b1111_1110) % self.total_chr_banks;
                             self.chr_banks[1] = self.chr_banks[0] + 1;
                         }
                         0b001 => {
-                            self.chr_banks[2] = (value & 0b1111_1110) % self.total_chr_banks;
+                            self.chr_banks[2] = (value as u16 & 0b1111_1110) % self.total_chr_banks;
                             self.chr_banks[3] = self.chr_banks[2] + 1;
                         }
-                        0b010..=0b101 => self.chr_banks[self.bank_select as usize + 2] = value % self.total_chr_banks,
+                        0b010..=0b101 => {
+                            self.chr_banks[self.bank_select as usize + 2] = value as u16 % self.total_chr_banks
+                        }
                         _ => (), // Do nothing with PRG banks here
                     };
 
@@ -428,7 +430,7 @@ pub(crate) fn from_header(
         )),
         Box::new(match chr_rom {
             None => MMC3ChrChip::new(ChrData::Ram(Box::new([0; 0x2000])), 8, header.mirroring),
-            Some(rom) => MMC3ChrChip::new(ChrData::Rom(rom), header.chr_rom_8kb_units * 4, header.mirroring),
+            Some(rom) => MMC3ChrChip::new(ChrData::Rom(rom), header.chr_rom_8kb_units as u16 * 8, header.mirroring),
         }),
         header,
     )

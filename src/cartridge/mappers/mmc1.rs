@@ -37,7 +37,7 @@ impl LoadRegister {
 pub(crate) struct MMC1PrgChip {
     prg_rom: Vec<u8>,
     prg_banks: u8,
-    prg_ram: Option<[u8; 0x2000]>,
+    prg_ram: [u8; 0x2000],
     prg_ram_enabled: bool,
     prg_bank_mode: PRGBankMode,
     prg_bank: u8,
@@ -46,13 +46,13 @@ pub(crate) struct MMC1PrgChip {
 }
 
 impl MMC1PrgChip {
-    fn new(prg_rom: Vec<u8>, prg_banks: u8, prg_ram: Option<[u8; 0x2000]>) -> Self {
+    fn new(prg_rom: Vec<u8>, prg_banks: u8) -> Self {
         debug_assert!(prg_rom.len() >= 0x4000);
 
         let mut chip = MMC1PrgChip {
             prg_rom,
             prg_banks,
-            prg_ram,
+            prg_ram: [0; 0x2000],
             prg_ram_enabled: true,
             prg_bank_mode: PRGBankMode::FixLast16KB,
             prg_bank: 0,
@@ -117,16 +117,13 @@ impl MMC1PrgChip {
 impl CpuCartridgeAddressBus for MMC1PrgChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x6000..=0x7FFF => match self.prg_ram {
-                Some(ram) => {
-                    if self.prg_ram_enabled {
-                        ram[(address - 0x6000) as usize]
-                    } else {
-                        0x0
-                    }
+            0x6000..=0x7FFF => {
+                if self.prg_ram_enabled {
+                    self.prg_ram[(address - 0x6000) as usize]
+                } else {
+                    0x0
                 }
-                None => 0x0,
-            },
+            }
             0x8000..=0xBFFF => {
                 let adj_addr = address as usize - 0x8000;
 
@@ -150,11 +147,9 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
 
         match address {
             0x6000..=0x7FFF => {
-                if let Some(ram) = &mut self.prg_ram {
-                    if self.prg_ram_enabled {
-                        // TODO - some variants of MMC1 always have RAM enabled
-                        ram[(address - 0x6000) as usize] = value;
-                    }
+                if self.prg_ram_enabled {
+                    // TODO - some variants of MMC1 always have RAM enabled
+                    self.prg_ram[(address - 0x6000) as usize] = value;
                 }
             }
             0x8000..=0xFFFF => {
@@ -303,7 +298,6 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
             }
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
-                debug!("Read {:04X} mirrored to {:04X}", address, mirrored_address);
 
                 self.ppu_vram[mirrored_address as usize]
             }
@@ -380,11 +374,7 @@ pub(crate) fn from_header(
     CartridgeHeader,
 ) {
     (
-        Box::new(MMC1PrgChip::new(
-            prg_rom,
-            header.prg_rom_16kb_units,
-            if header.has_ram { Some([0; 0x2000]) } else { None },
-        )),
+        Box::new(MMC1PrgChip::new(prg_rom, header.prg_rom_16kb_units)),
         Box::new(MMC1ChrChip::new(chr_rom, header.chr_rom_8kb_units * 2)),
         header,
     )
@@ -397,7 +387,7 @@ mod mmc1_tests {
 
     #[test]
     fn test_change_bank() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, None);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
@@ -409,7 +399,7 @@ mod mmc1_tests {
 
     #[test]
     fn test_change_bank_needs_wrap() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 2], 2, None);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 2], 2);
         mmc1.write_byte(0xE000, 0b0011, 0);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
@@ -421,7 +411,7 @@ mod mmc1_tests {
 
     #[test]
     fn test_ignore_sequential_writes() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, None);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 2);
         mmc1.write_byte(0xE000, 0b0000, 4);
@@ -436,7 +426,7 @@ mod mmc1_tests {
     #[test]
     fn test_set_control_register() {
         let value = 0b1111;
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, None);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
         mmc1.write_byte(0x8000, 0, 0);
         mmc1.write_byte(0x8000, 0, 2);
         mmc1.write_byte(0x8000, 0, 4);

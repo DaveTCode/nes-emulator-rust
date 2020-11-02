@@ -16,7 +16,7 @@ enum PRGBankMode {
 pub(crate) struct MMC3PrgChip {
     prg_rom: Vec<u8>,
     total_prg_banks: u8,
-    prg_ram: Option<[u8; 0x2000]>,
+    prg_ram: [u8; 0x2000],
     prg_ram_readonly: bool,
     prg_ram_disabled: bool,
     prg_banks: [u8; 4],
@@ -27,13 +27,13 @@ pub(crate) struct MMC3PrgChip {
 }
 
 impl MMC3PrgChip {
-    fn new(prg_rom: Vec<u8>, total_prg_banks: u8, prg_ram: Option<[u8; 0x2000]>) -> Self {
+    fn new(prg_rom: Vec<u8>, total_prg_banks: u8) -> Self {
         debug_assert!(prg_rom.len() >= 0x4000);
 
         MMC3PrgChip {
             prg_rom,
             total_prg_banks,
-            prg_ram,
+            prg_ram: [0; 0x2000],
             prg_ram_readonly: false,
             prg_ram_disabled: false,
             prg_banks: [0, 1, total_prg_banks - 2, total_prg_banks - 1],
@@ -72,16 +72,13 @@ impl MMC3PrgChip {
 impl CpuCartridgeAddressBus for MMC3PrgChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x6000..=0x7FFF => match self.prg_ram {
-                Some(ram) => {
-                    if self.prg_ram_disabled {
-                        0x0 // TODO - Should be open bus
-                    } else {
-                        ram[(address - 0x6000) as usize]
-                    }
+            0x6000..=0x7FFF => {
+                if self.prg_ram_disabled {
+                    0x0 // TODO - Should be open bus
+                } else {
+                    self.prg_ram[(address - 0x6000) as usize]
                 }
-                None => 0x0,
-            },
+            }
             // PRG Bank 0 - Switchable or fixed to second to last bank
             0x8000..=0x9FFF => {
                 let adj_addr = address as usize - 0x8000;
@@ -111,10 +108,8 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
 
         match address {
             0x6000..=0x7FFF => {
-                if let Some(ram) = &mut self.prg_ram {
-                    if !self.prg_ram_disabled && !self.prg_ram_readonly {
-                        ram[(address - 0x6000) as usize] = value
-                    }
+                if !self.prg_ram_disabled && !self.prg_ram_readonly {
+                    self.prg_ram[(address - 0x6000) as usize] = value
                 }
             }
             // Bank select and Bank data registers
@@ -423,11 +418,7 @@ pub(crate) fn from_header(
     CartridgeHeader,
 ) {
     (
-        Box::new(MMC3PrgChip::new(
-            prg_rom,
-            header.prg_rom_16kb_units * 2,
-            Some([0; 0x2000]),
-        )),
+        Box::new(MMC3PrgChip::new(prg_rom, header.prg_rom_16kb_units * 2)),
         Box::new(match chr_rom {
             None => MMC3ChrChip::new(ChrData::Ram(Box::new([0; 0x2000])), 8, header.mirroring),
             Some(rom) => MMC3ChrChip::new(ChrData::Rom(rom), header.chr_rom_8kb_units as u16 * 8, header.mirroring),

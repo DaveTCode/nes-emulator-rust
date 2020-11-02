@@ -71,7 +71,7 @@ pub(crate) struct CartridgeHeader {
     pub(crate) chr_rom_8kb_units: u8,
     pub(crate) mapper: u8,
     pub(crate) mirroring: MirroringMode,
-    pub(crate) has_ram: bool,
+    pub(crate) ram_is_battery_backed: bool,
     // TODO - Lots more flags and possible options
 }
 
@@ -86,7 +86,7 @@ impl CartridgeHeader {
                 (false, true) => MirroringMode::Vertical,
                 (_, false) => MirroringMode::FourScreen,
             },
-            has_ram: flags_6 & 0b10 == 0b10,
+            ram_is_battery_backed: flags_6 & 0b10 == 0b10,
         }
     }
 }

@@ -267,18 +267,18 @@ impl super::Ppu {
                         SpriteEvaluation::Completed
                     }
                 } else {
-                    // Skip to the next sprite, this one doesn't overlap
-                    if (self.sprite_data.oam_addr as usize + 4) < self.sprite_data.oam_ram.len() {
-                        self.sprite_data.oam_addr += 4;
-
-                        // Sprite overflow bug, increment oam_addr once too many when sprite doesn't overlap
-                        if self.sprite_data.secondary_oam_ram_pointer >= self.sprite_data.secondary_oam_ram.len() {
-                            if self.sprite_data.oam_addr & 3 == 3 {
-                                self.sprite_data.oam_addr -= 4;
-                            }
-                            self.sprite_data.oam_addr += 1;
+                    let mut next_oam_addr = self.sprite_data.oam_addr as usize + 4;
+                    // Sprite overflow bug, increment oam_addr once too many when sprite doesn't overlap
+                    if self.sprite_data.secondary_oam_ram_pointer >= self.sprite_data.secondary_oam_ram.len() {
+                        if next_oam_addr & 3 == 3 {
+                            next_oam_addr -= 4;
                         }
+                        next_oam_addr += 1;
+                    }
 
+                    // Skip to the next sprite, this one doesn't overlap
+                    if next_oam_addr < self.sprite_data.oam_ram.len() {
+                        self.sprite_data.oam_addr = next_oam_addr as u8;
                         SpriteEvaluation::ReadY
                     } else {
                         SpriteEvaluation::Completed

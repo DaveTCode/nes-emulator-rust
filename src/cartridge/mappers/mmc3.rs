@@ -257,24 +257,26 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
     }
 
     fn update_vram_address(&mut self, address: u16, ppu_cycles: u32) {
-        let cycle_diff = match self.a12_cycles_at_last_low {
-            None => None,
-            Some(c) => Some(ppu_cycles - c),
-        };
+        if address < 0x2000 {
+            let cycle_diff = match self.a12_cycles_at_last_low {
+                None => None,
+                Some(c) => Some(ppu_cycles - c),
+            };
 
-        info!(
-            "MMC3 notified of PPU ADDR change {:04X} at cycle {}",
-            address, ppu_cycles
-        );
+            info!(
+                "MMC3 notified of PPU ADDR change {:04X} at cycle {}",
+                address, ppu_cycles
+            );
 
-        self.a12_cycles_at_last_low = match (address & 0x1000 == 0x1000, cycle_diff) {
-            (false, _) => Some(ppu_cycles),
-            (true, Some(6..=u32::MAX)) => {
-                self.clock_irq_counter();
-                None
-            }
-            (true, _) => self.a12_cycles_at_last_low,
-        };
+            self.a12_cycles_at_last_low = match (address & 0x1000 == 0x1000, cycle_diff) {
+                (false, _) => Some(ppu_cycles),
+                (true, Some(6..=u32::MAX)) => {
+                    self.clock_irq_counter();
+                    None
+                }
+                (true, _) => self.a12_cycles_at_last_low,
+            };
+        }
     }
 
     fn read_byte(&mut self, address: u16, _: u32) -> u8 {

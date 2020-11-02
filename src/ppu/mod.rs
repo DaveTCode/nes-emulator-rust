@@ -472,8 +472,7 @@ impl Ppu {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.nametable_byte = self.read_byte(self.internal_registers.next_address);
                 } else {
-                    // TODO - Needs to be disabled to get MMC3 IRQ working??
-                    //self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
+                    self.read_byte(self.internal_registers.next_address); // Garbage nametable byte during sprite read & end of line fetches
                 }
             }
             3 => {
@@ -486,8 +485,7 @@ impl Ppu {
                 if cycle <= 256 || (cycle >= 321 && cycle <= 336) {
                     self.scanline_state.attribute_table_byte = self.read_byte(self.internal_registers.next_address);
                 } else {
-                    // TODO - Needs to be disabled to get MMC3 IRQ working??
-                    //self.read_byte(self.internal_registers.next_address); // Garbage attribute byte during sprite read & end of line fetches
+                    self.read_byte(self.internal_registers.next_address); // Garbage attribute byte during sprite read & end of line fetches
                 }
             }
             5 => {

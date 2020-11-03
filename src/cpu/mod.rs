@@ -13,7 +13,7 @@ use cpu::status_flags::StatusFlags;
 use io::Button;
 use io::Controller;
 use io::Io;
-use log::{debug, info};
+use log::{debug, error, info};
 use ppu::Ppu;
 use ppu::SCREEN_HEIGHT;
 use ppu::SCREEN_WIDTH;
@@ -110,7 +110,7 @@ pub struct Cpu<'a> {
     state: State,
     registers: Registers,
     pub(crate) cycles: u32,
-    // TODO - apu_cycle_counter: u8,
+    apu_cycle: bool,
     cpu_cycle_counter: u8,
     ram: [u8; 0x800],
     apu: &'a mut Apu,
@@ -136,6 +136,7 @@ impl<'a> Cpu<'a> {
             state: State::Cpu(CpuState::FetchOpcode),
             registers: Registers::new(pc),
             cycles: 0,
+            apu_cycle: false,
             cpu_cycle_counter: 1,
             ram: [0; 0x800],
             apu,
@@ -151,10 +152,9 @@ impl<'a> Cpu<'a> {
         debug!("CPU address space read {:04X}", address);
 
         match address {
-            0x0000..=0x07FF => self.ram[address as usize],
-            0x0800..=0x1FFF => self.ram[(address % 0x0800) as usize], // Mirrors of ram space
+            0x0000..=0x1FFF => self.ram[(address & 0x7FF) as usize],
             0x2000..=0x2007 => self.ppu.read_register(address),
-            0x2008..=0x3FFF => self.ppu.read_register((address % 8) + 0x2000),
+            0x2008..=0x3FFF => self.ppu.read_register((address & 7) + 0x2000),
             0x4000..=0x4013 | 0x4015 => self.apu.read_byte(address), // APU registers
             0x4014 => 0x00, // TODO - Is this correct? We read 0 on the DMA register?
             0x4016..=0x4017 => self.io.read_byte(address), // Controller registers
@@ -167,8 +167,7 @@ impl<'a> Cpu<'a> {
         debug!("CPU address space write {:04X} = {:02X}", address, value);
 
         match address {
-            0x0000..=0x07FF => self.ram[address as usize] = value,
-            0x0800..=0x1FFF => self.ram[(address % 0x0800) as usize] = value, // Mirrors of ram space
+            0x0000..=0x1FFF => self.ram[(address & 0x7FF) as usize] = value,
             0x2000..=0x2007 => self.ppu.write_register(address, value),
             0x2008..=0x3FFF => self.ppu.write_register((address % 8) + 0x2000, value),
             0x4000..=0x4013 | 0x4015 | 0x4017 => self.apu.write_byte(address, value), // APU registers
@@ -1050,6 +1049,12 @@ impl<'a> Iterator for Cpu<'a> {
         if self.cpu_cycle_counter == 0 {
             self.cpu_cycle_counter = 3;
             self.clock();
+
+            // Clock the APU once every two CPU cycles
+            if self.apu_cycle {
+                self.apu.next();
+            }
+            self.apu_cycle = !self.apu_cycle;
         }
 
         // Always clock the PPU

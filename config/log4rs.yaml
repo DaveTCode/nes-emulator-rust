@@ -16,21 +16,17 @@ appenders:
 
 root:
   level: error
+  appenders:
+    - file
 
 loggers:
+  rust_nes::apu:
+    level: debug
   rust_nes::cpu:
-    level: error
-    appenders:
-      - file
+    level: info
   rust_nes::ppu:
     level: error
-    appenders:
-      - file
   rust_nes::cartridge:
     level: error
-    appenders:
-      - file
   rust_nes::io:
     level: error
-    appenders:
-      - file

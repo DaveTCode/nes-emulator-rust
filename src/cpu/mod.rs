@@ -110,7 +110,6 @@ pub struct Cpu<'a> {
     state: State,
     registers: Registers,
     pub(crate) cycles: u32,
-    apu_cycle: bool,
     cpu_cycle_counter: u8,
     ram: [u8; 0x800],
     apu: &'a mut Apu,
@@ -136,7 +135,6 @@ impl<'a> Cpu<'a> {
             state: State::Cpu(CpuState::FetchOpcode),
             registers: Registers::new(pc),
             cycles: 0,
-            apu_cycle: false,
             cpu_cycle_counter: 1,
             ram: [0; 0x800],
             apu,
@@ -200,7 +198,7 @@ impl<'a> Cpu<'a> {
             self.registers.stack_pointer,
             self.ppu.current_scanline_cycle(),
             self.ppu.current_scanline(),
-            self.cycles + 8 // TODO - Why do cycle counts start at 7? Startup process?
+            self.cycles + 8 // TODO - Why do cycle counts start at 8? Startup process?
         )
     }
 
@@ -1050,11 +1048,8 @@ impl<'a> Iterator for Cpu<'a> {
             self.cpu_cycle_counter = 3;
             self.clock();
 
-            // Clock the APU once every two CPU cycles
-            if self.apu_cycle {
-                self.apu.next();
-            }
-            self.apu_cycle = !self.apu_cycle;
+            // Clock the APU once every CPU cycle, it decides internally which things to clock at what speed
+            self.apu.next();
         }
 
         // Always clock the PPU

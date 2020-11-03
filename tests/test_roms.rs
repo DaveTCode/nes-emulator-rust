@@ -125,6 +125,16 @@ rom_tests! {
     //mmc3_irq_scanline_timing: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("4-scanline_timing.nes")), // Failed #14 - IRQ never occurred
     mmc3_irq_mmc3: (0x163A62 * 3 as usize, 144123581, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("5-MMC3.nes")),
     //mmc3_irq_mmc3_alt: (0x90CD6 * 3 as usize, 3691845950, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("6-MMC3_alt.nes")), // Failed #2 - Don't think I support the MMC3 alternate board
+
+    // ----- APU Tests -----
+    apu_test_1_length_counter: (0x1551B8 * 3 as usize, 1135491406, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("1-len_ctr.nes")),
+    apu_test_2_length_table: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("2-len_table.nes")),
+    apu_test_3_irq_flag: (0x1D7FA9 * 3 as usize, 902361631, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("3-irq_flag.nes")),
+    //apu_test_4_jitter: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("4-jitter.nes")), // Frame IRQ is set too soon
+    //apu_test_5_length_timing: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("5-len_timing.nes")), Failed #7 on channel 0
+    //apu_test_6_irq_flag_timing: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("6-irq_flag_timing.nes")), // Frame IRQ isn't really set yet
+    //apu_test_7_dmc_basics: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("7-dmc_basics.nes")), // DMC channel not implemented
+    //apu_test_8_dmc_rates: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("8-dmc_rates.nes")), // DMC channel not implemented
 }
 
 const ASCII_GRAYSCALE_ARRAY: [char; 96] = [

@@ -2,17 +2,27 @@ use apu::dmc_channel::DmcChannel;
 use apu::noise_channel::NoiseChannel;
 use apu::pulse_channel::PulseChannel;
 use apu::triangle_channel::TriangleChannel;
-use log::info;
+use log::{debug, info};
 
 mod dmc_channel;
+mod length_counter;
 mod noise_channel;
 mod pulse_channel;
 mod triangle_channel;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum FrameCounterMode {
     FourStep,
     FiveStep,
+}
+
+impl FrameCounterMode {
+    fn wrapping_number(&self) -> u32 {
+        match self {
+            FrameCounterMode::FourStep => 14915,
+            FrameCounterMode::FiveStep => 18641,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -20,16 +30,21 @@ struct FrameCounter {
     inhibit_interrupts: bool,
     mode: FrameCounterMode,
     step: u8,
+    sequence_cycles: u32,
+    timer_reset_countdown: u8,
 }
 
+type ApuCycle = u32;
+
 impl FrameCounter {
-    fn set(&mut self, value: u8) {
+    fn set(&mut self, value: u8, is_apu_cycle: bool) {
         if value & 0b1000_0000 == 0 {
             self.mode = FrameCounterMode::FourStep
         } else {
             self.mode = FrameCounterMode::FiveStep
         }
         self.inhibit_interrupts = value & 0b0100_0000 == 0b0100_0000;
+        self.timer_reset_countdown = if is_apu_cycle { 3 } else { 4 };
     }
 }
 
@@ -40,6 +55,9 @@ pub(crate) struct Apu {
     noise_channel: NoiseChannel,
     dmc_channel: DmcChannel,
     frame_counter: FrameCounter,
+    total_apu_cycles: ApuCycle,
+    is_apu_cycle: bool,
+    frame_interrupt: bool,
 }
 
 impl Apu {
@@ -54,46 +72,55 @@ impl Apu {
                 inhibit_interrupts: false,
                 mode: FrameCounterMode::FourStep,
                 step: 0,
+                sequence_cycles: 0,
+                timer_reset_countdown: 0,
             },
+            total_apu_cycles: 4, // TODO - What's the total number of APU cycles that occur during startup? 8/2?
+            is_apu_cycle: false, // TODO - Guesswork, does the APU clock on cpu cycle 0 or 1?
+            frame_interrupt: false,
         }
     }
 
     fn write_status_register(&mut self, value: u8) {
-        if value & 0b1 == 0 {
-            self.pulse_channel_1.disable();
-        }
-        if value & 0b10 == 0 {
-            self.pulse_channel_2.disable();
-        }
-        if value & 0b100 == 0 {
-            self.triangle_channel.disable();
-        }
-        if value & 0b1000 == 0 {
-            self.noise_channel.disable();
-        }
+        self.pulse_channel_1.set_enabled(value & 0b1 != 0);
+        self.pulse_channel_2.set_enabled(value & 0b10 != 0);
+        self.triangle_channel.set_enabled(value & 0b100 != 0);
+        self.noise_channel.set_enabled(value & 0b1000 != 0);
         if value & 0b1_0000 == 0 {
             self.dmc_channel.disable();
         }
     }
 
-    fn read_status_register(&self) -> u8 {
+    fn read_status_register(&mut self) -> u8 {
         let mut mask = 0u8;
-        if self.pulse_channel_1.length_counter > 0 {
+        if self.pulse_channel_1.non_zero_length_counter() {
             mask |= 0b1
         };
-        if self.pulse_channel_2.length_counter > 0 {
+        if self.pulse_channel_2.non_zero_length_counter() {
             mask |= 0b10
         };
-        // TODO - Read length from other channels
+        if self.triangle_channel.non_zero_length_counter() {
+            mask |= 0b100
+        };
+        if self.noise_channel.non_zero_length_counter() {
+            mask |= 0b1000
+        };
+        // TODO - Read length from DMC channel
+
+        // TODO - Set DMC interrupt flag
+        if self.frame_interrupt {
+            mask |= 0b0100_0000;
+        }
+        self.frame_interrupt = false;
 
         info!("Reading APU status register as {:02X}", mask);
         mask
     }
 
-    pub(crate) fn read_byte(&self, address: u16) -> u8 {
+    pub(crate) fn read_byte(&mut self, address: u16) -> u8 {
         info!("Reading byte from APU registers {:04X}", address);
         match address {
-            0x4000..=0x4014 => 0x0, // TODO
+            0x4000..=0x4014 => 0x0, // TODO - what does this return? Open bus or 0?
             0x4015 => self.read_status_register(),
             _ => panic!("Address invalid for APU {:04X}", address),
         }
@@ -110,14 +137,49 @@ impl Apu {
             0x4005 => self.pulse_channel_2.load_sweep_register(value),
             0x4006 => self.pulse_channel_2.load_timer_low(value),
             0x4007 => self.pulse_channel_2.load_length_timer_high(value),
-            0x4008..=0x4014 => {} // TODO
+            0x4008 => self.triangle_channel.load_linear_counter(value),
+            0x4009 => {} // Unused
+            0x400A => self.triangle_channel.load_timer_low(value),
+            0x400B => self.triangle_channel.load_length_timer_high(value),
+            0x400C => self.noise_channel.write_length_halt_envelope_register(value),
+            0x400D => {} // Unused
+            0x400E => self.noise_channel.set_mode_and_period(value),
+            0x400F => self.noise_channel.load_length_counter(value),
+            0x4010..=0x4014 => {} // TODO - DMC channel
             0x4015 => self.write_status_register(value),
             0x4017 => {
-                // TODO - Various side effects happen here e.g.: clocking components if mode is set to 5 step etc
-                self.frame_counter.set(value);
+                self.frame_counter.set(value, self.is_apu_cycle);
+                if self.frame_counter.inhibit_interrupts {
+                    self.frame_interrupt = false;
+                }
+                // TODO - Should reset timer (which one?) after 3-4 CPU cycles
+
+                if self.frame_counter.mode == FrameCounterMode::FiveStep {
+                    self.half_frame();
+                    self.quarter_frame();
+                }
             }
             _ => panic!("Address invalid for APU {:04X}", address),
         }
+    }
+
+    fn quarter_frame(&mut self) {
+        info!("Running quarter frame update: apu_cycles={}", self.total_apu_cycles);
+        // TODO - Update envelopes and linear counters
+        self.triangle_channel.clock_linear_counter();
+    }
+
+    fn half_frame(&mut self) {
+        info!("Running half frame update: apu_cycles={}", self.total_apu_cycles);
+        self.quarter_frame();
+        self.pulse_channel_1.clock_length_counter();
+        self.pulse_channel_2.clock_length_counter();
+        self.triangle_channel.clock_length_counter();
+        self.noise_channel.clock_length_counter();
+        // TODO - Update length counter on DMC channel
+
+        self.pulse_channel_1.clock_sweep_unit();
+        self.pulse_channel_2.clock_sweep_unit();
     }
 }
 
@@ -125,40 +187,47 @@ impl Iterator for Apu {
     type Item = ();
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.frame_counter.mode {
-            FrameCounterMode::FourStep => {
-                if self.frame_counter.step & 1 == 1 {
-                    self.pulse_channel_1.clock_length_counter();
-                    self.pulse_channel_2.clock_length_counter();
-                    self.pulse_channel_1.clock_sweep_unit();
-                    self.pulse_channel_2.clock_sweep_unit();
-
-                    if self.frame_counter.step == 3 {
-                        // TODO - Check for interrupts that need setting
-                    }
-                }
-
-                // TODO - Step envelope and linear counter
-
-                self.frame_counter.step = (self.frame_counter.step + 1) & 3;
-            }
-            FrameCounterMode::FiveStep => {
-                if self.frame_counter.step == 1 || self.frame_counter.step == 4 {
-                    self.pulse_channel_1.clock_length_counter();
-                    self.pulse_channel_2.clock_length_counter();
-                    // TODO - Step length counter and sweep unit
-                }
-
-                if self.frame_counter.step != 3 {
-                    // TODO - Step envelope and linear counter
-                }
-
-                self.frame_counter.step = (self.frame_counter.step + 1) % 5;
+        if self.frame_counter.timer_reset_countdown > 0 {
+            self.frame_counter.timer_reset_countdown -= 1;
+            if self.frame_counter.timer_reset_countdown == 0 {
+                self.frame_counter.sequence_cycles = 0;
             }
         }
 
-        self.pulse_channel_1.clock_timer();
-        self.pulse_channel_2.clock_timer();
+        if self.is_apu_cycle {
+            self.frame_counter.sequence_cycles =
+                (self.frame_counter.sequence_cycles + 1) % self.frame_counter.mode.wrapping_number();
+
+            // TODO - Do we also need to check for interrupts on the non-apu cycle to catch writes?
+            if !self.frame_counter.inhibit_interrupts
+                && (self.frame_counter.sequence_cycles == 14914 || self.frame_counter.sequence_cycles == 0)
+                && self.frame_counter.mode == FrameCounterMode::FourStep
+            {
+                // TODO - This doesn't actually trigger an IRQ yet
+                self.frame_interrupt = true;
+            }
+
+            // Note that the timers are not clocked by the frame counter but on every apu cycle
+            self.pulse_channel_1.clock_timer();
+            self.pulse_channel_2.clock_timer();
+
+            self.total_apu_cycles = self.total_apu_cycles.wrapping_add(1);
+        } else {
+            // Note that the clocking here actually occurs on the NON APU cycle deliberately
+            match self.frame_counter.sequence_cycles {
+                3729 => self.quarter_frame(),
+                7457 => self.half_frame(),
+                11186 => self.quarter_frame(),
+                0 => self.half_frame(),
+                _ => (),
+            };
+        }
+
+        // Note this is clocked on all CPU cycles
+        self.triangle_channel.clock_timer();
+
+        // Every other cycle is an APU cycle (as clocked by the CPU)
+        self.is_apu_cycle = !self.is_apu_cycle;
 
         // Apu never stops clocking
         None

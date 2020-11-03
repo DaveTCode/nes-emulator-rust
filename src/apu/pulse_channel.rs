@@ -1,15 +1,12 @@
+use apu::length_counter::LengthCounter;
 use log::{debug, info};
-
-const LENGTH_COUNTER_MAP: [u8; 0x20] = [
-    0x0A, 0xFE, 0x14, 0x02, 0x28, 0x04, 0x50, 0x06, 0xA0, 0x08, 0x3C, 0x0A, 0x0E, 0x0C, 0x1A, 0x0E, 0x0C, 0x10, 0x18,
-    0x12, 0x30, 0x14, 0x60, 0x16, 0xC0, 0x18, 0x48, 0x1A, 0x10, 0x1C, 0x20, 0x1E,
-];
 
 const EIGHTH_DUTY_CYCLE: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 1];
 const QUARTER_DUTY_CYCLE: [u8; 8] = [0, 0, 0, 0, 0, 0, 1, 1];
 const HALF_DUTY_CYCLE: [u8; 8] = [0, 0, 0, 0, 1, 1, 1, 1];
 const NEGATIVE_QUARTER_DUTY_CYCLE: [u8; 8] = [1, 1, 1, 1, 1, 1, 0, 0];
 
+#[derive(Debug)]
 struct SweepUnit {
     enabled: bool,
     divider_period: u8,
@@ -35,11 +32,11 @@ impl SweepUnit {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct PulseChannel {
     name: String,
     enabled: bool,
-    pub(super) length_counter: u8,
-    length_counter_halt: bool,
+    length_counter: LengthCounter,
     duty_cycle: [u8; 8],
     sequence: usize,
     timer_load: u16,
@@ -52,8 +49,7 @@ impl PulseChannel {
         PulseChannel {
             name,
             enabled: false,
-            length_counter: 0,
-            length_counter_halt: false,
+            length_counter: LengthCounter::new(),
             duty_cycle: EIGHTH_DUTY_CYCLE,
             sequence: 0,
             timer_load: 0,
@@ -62,9 +58,11 @@ impl PulseChannel {
         }
     }
 
-    pub(super) fn disable(&self) {
-        self.enabled = false;
-        self.length_counter = 0;
+    pub(super) fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+        if !enabled {
+            self.length_counter.disable();
+        }
     }
 
     /// Corresponds to writes to 0x4000 (pulse 1) & 0x4004 (pulse 2)
@@ -76,7 +74,7 @@ impl PulseChannel {
             0b11 => NEGATIVE_QUARTER_DUTY_CYCLE,
             _ => panic!(),
         };
-        self.length_counter_halt = value & 0b0010_0000 != 0;
+        self.length_counter.set_halt(value & 0b0010_0000 != 0);
         // TODO - Envelope and constant volume flags
     }
 
@@ -89,9 +87,9 @@ impl PulseChannel {
     /// Corresponds to writes to 0x4003 (pulse 1) & 0x4007 (pulse 2)
     pub(super) fn load_length_timer_high(&mut self, value: u8) {
         if self.enabled {
-            self.length_counter = LENGTH_COUNTER_MAP[(((value as usize) & 0b1111_1000) >> 3)];
+            self.length_counter.set(value);
             info!(
-                "Loaded length counter for {}: {:02X} -> {:0X}",
+                "Loaded length counter for {}: {:02X} -> {:?}",
                 self.name, value, self.length_counter
             );
         }
@@ -107,12 +105,13 @@ impl PulseChannel {
         self.sweep_unit.update(value);
     }
 
+    pub(crate) fn non_zero_length_counter(&self) -> bool {
+        self.length_counter.is_non_zero()
+    }
+
     pub(super) fn clock_length_counter(&mut self) {
-        if !self.length_counter_halt {
-            debug!("Clocking length counter for {} {}", self.name, self.length_counter);
-            self.length_counter = self.length_counter.saturating_sub(1);
-            // TODO - Disable output on length 0 or just track it as length 0?}
-        }
+        info!("Clocking length counter for {} {:?}", self.name, self.length_counter);
+        self.length_counter.clock();
     }
 
     pub(super) fn clock_sweep_unit(&mut self) {

@@ -21,9 +21,9 @@ root:
 
 loggers:
   rust_nes::apu:
-    level: debug
+    level: error
   rust_nes::cpu:
-    level: info
+    level: error
   rust_nes::ppu:
     level: error
   rust_nes::cartridge:

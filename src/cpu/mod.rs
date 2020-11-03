@@ -106,10 +106,12 @@ enum CpuState {
     },
 }
 
-pub struct Cpu<'a> {
+pub(crate) type CpuCycle = u32;
+
+pub(crate) struct Cpu<'a> {
     state: State,
     registers: Registers,
-    pub(crate) cycles: u32,
+    pub(crate) cycles: CpuCycle,
     cpu_cycle_counter: u8,
     ram: [u8; 0x800],
     apu: &'a mut Apu,

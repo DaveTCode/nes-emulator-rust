@@ -10,6 +10,11 @@ mod noise_channel;
 mod pulse_channel;
 mod triangle_channel;
 
+/// This type is used to represent an APU cycle to make it clearer when
+/// we're talking about cycles which type (PPU, CPU, APU) we mean.
+/// An APU cycle occurs once for every two CPU cycles.
+type ApuCycle = u32;
+
 #[derive(Debug, PartialEq)]
 enum FrameCounterMode {
     FourStep,
@@ -30,11 +35,9 @@ struct FrameCounter {
     inhibit_interrupts: bool,
     mode: FrameCounterMode,
     step: u8,
-    sequence_cycles: u32,
+    sequence_cycles: ApuCycle,
     timer_reset_countdown: u8,
 }
-
-type ApuCycle = u32;
 
 impl FrameCounter {
     fn set(&mut self, value: u8, is_apu_cycle: bool) {
@@ -165,7 +168,7 @@ impl Apu {
 
     fn quarter_frame(&mut self) {
         info!("Running quarter frame update: apu_cycles={}", self.total_apu_cycles);
-        // TODO - Update envelopes and linear counters
+        // TODO - Update envelopes
         self.triangle_channel.clock_linear_counter();
     }
 
@@ -176,7 +179,6 @@ impl Apu {
         self.pulse_channel_2.clock_length_counter();
         self.triangle_channel.clock_length_counter();
         self.noise_channel.clock_length_counter();
-        // TODO - Update length counter on DMC channel
 
         self.pulse_channel_1.clock_sweep_unit();
         self.pulse_channel_2.clock_sweep_unit();

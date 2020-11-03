@@ -2,7 +2,9 @@ mod mappers;
 mod mirroring;
 
 use cartridge::mirroring::MirroringMode;
+use cpu::CpuCycle;
 use log::info;
+use ppu::PpuCycle;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
@@ -44,7 +46,7 @@ pub(crate) trait CpuCartridgeAddressBus {
     /// Read from the 16 bit CPU address bus
     fn read_byte(&self, address: u16) -> u8;
     /// Write to the 16 bit CPU address bus
-    fn write_byte(&mut self, address: u16, value: u8, cycles: u32);
+    fn write_byte(&mut self, address: u16, value: u8, cycles: PpuCycle);
 }
 
 /// A trait representing the PPU address bus into the cartridge
@@ -54,13 +56,13 @@ pub(crate) trait PpuCartridgeAddressBus {
     fn check_trigger_irq(&mut self) -> bool;
     /// Certain mappers can trigger an IRQ based on scanline counting (MMC3)
     /// This function allows the mapper to listen on address bus changes
-    fn update_vram_address(&mut self, address: u16, ppu_cycles: u32);
+    fn update_vram_address(&mut self, address: u16, cycles: PpuCycle);
     /// Read from the 14 bit PPU address bus
-    fn read_byte(&mut self, address: u16, cycles: u32) -> u8;
+    fn read_byte(&mut self, address: u16, cycles: PpuCycle) -> u8;
     /// Write to the 14 bit PPU address bus
-    fn write_byte(&mut self, address: u16, value: u8, cycles: u32);
+    fn write_byte(&mut self, address: u16, value: u8, cycles: PpuCycle);
     /// Write to the 16 bit CPU address bus, required to set mapper registers
-    fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: u32);
+    fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: CpuCycle);
 }
 
 /// Represents flags/details about the rom from the header

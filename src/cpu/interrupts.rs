@@ -1,10 +1,12 @@
+use ppu::PpuCycle;
+
 #[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum Interrupt {
-    NMI(u32),
-    IRQ(u32),
-    IRQ_BRK(u32),
-    RESET(u32),
+    NMI(PpuCycle),
+    IRQ(PpuCycle),
+    IRQ_BRK(PpuCycle),
+    RESET(PpuCycle),
 }
 
 impl Interrupt {

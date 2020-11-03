@@ -3,7 +3,9 @@ use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
+use cpu::CpuCycle;
 use log::{debug, error, info};
+use ppu::PpuCycle;
 
 #[derive(Debug, PartialEq)]
 enum PRGBankMode {
@@ -21,7 +23,7 @@ enum CHRBankMode {
 struct LoadRegister {
     shift_writes: u8,
     value: u8,
-    last_write_cycle: u32,
+    last_write_cycle: PpuCycle,
 }
 
 impl LoadRegister {
@@ -138,7 +140,7 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, cycles: u32) {
+    fn write_byte(&mut self, address: u16, value: u8, cycles: PpuCycle) {
         // Skip writes on consecutive cycles
         if cycles == self.load_register.last_write_cycle + 1 {
             return;
@@ -283,9 +285,9 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
         false
     }
 
-    fn update_vram_address(&mut self, _: u16, _: u32) {}
+    fn update_vram_address(&mut self, _: u16, _: PpuCycle) {}
 
-    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
+    fn read_byte(&mut self, address: u16, _: PpuCycle) -> u8 {
         match address {
             0x0000..=0x1FFF => {
                 let adjusted_address =
@@ -306,7 +308,7 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+    fn write_byte(&mut self, address: u16, value: u8, _: PpuCycle) {
         debug!("MMC1 CHR write {:04X}={:02X}", address, value);
         match address {
             0x0000..=0x1FFF => {
@@ -327,7 +329,7 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
         }
     }
 
-    fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: u32) {
+    fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: CpuCycle) {
         debug!(
             "CPU write to MMC1 CHR bus {:04X}={:02X} at {:} cycles",
             address, value, cycles

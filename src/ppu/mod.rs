@@ -14,6 +14,10 @@ use ppu::sprites::SpriteData;
 pub(crate) const SCREEN_WIDTH: u32 = 256;
 pub(crate) const SCREEN_HEIGHT: u32 = 240;
 
+/// This type is used to represent a PPU cycle to make it clearer when
+/// we're talking about cycles which type (PPU, CPU, APU) we mean
+pub(crate) type PpuCycle = u32;
+
 #[derive(Debug)]
 struct ScanlineState {
     nametable_byte: u8,
@@ -152,14 +156,14 @@ impl InternalRegisters {
 }
 
 pub(crate) struct Ppu {
-    pub(crate) total_cycles: u32,
+    pub(crate) total_cycles: PpuCycle,
     scanline_state: ScanlineState,
     sprite_data: SpriteData,
     palette_ram: PaletteRam,
     ppu_ctrl: PpuCtrl,
     ppu_mask: PpuMask,
     ppu_status: PpuStatus,
-    last_ppu_status_read_cycle: u32,
+    last_ppu_status_read_cycle: PpuCycle,
     internal_registers: InternalRegisters,
     ppu_data_buffer: u8,   // Internal buffer returned on PPUDATA reads
     last_written_byte: u8, // Stores the value last written onto the latch - TODO implement decay over time
@@ -516,7 +520,7 @@ impl Ppu {
 
     /// Perform the dot based rendering for each cycle in a visible scanline
     fn draw_pixel(&mut self, scanline: u16, cycle: u16) {
-        let x = cycle as u32 - 1;
+        let x = cycle as PpuCycle - 1;
         let y = scanline as u32;
         let offset = ((SCREEN_WIDTH * y + x) * 4) as usize;
 
@@ -673,8 +677,10 @@ impl Iterator for Ppu {
 
 #[cfg(test)]
 mod ppu_tests {
-    use super::Ppu;
     use cartridge::PpuCartridgeAddressBus;
+    use cpu::CpuCycle;
+    use ppu::Ppu;
+    use ppu::PpuCycle;
 
     struct FakeCartridge {}
 
@@ -683,15 +689,15 @@ mod ppu_tests {
             false
         }
 
-        fn update_vram_address(&mut self, _: u16, _: u32) {}
+        fn update_vram_address(&mut self, _: u16, _: PpuCycle) {}
 
-        fn read_byte(&mut self, _: u16, _: u32) -> u8 {
+        fn read_byte(&mut self, _: u16, _: PpuCycle) -> u8 {
             0x0
         }
 
-        fn write_byte(&mut self, _: u16, _: u8, _: u32) {}
+        fn write_byte(&mut self, _: u16, _: u8, _: PpuCycle) {}
 
-        fn cpu_write_byte(&mut self, _: u16, _: u8, _: u32) {}
+        fn cpu_write_byte(&mut self, _: u16, _: u8, _: CpuCycle) {}
     }
 
     #[test]

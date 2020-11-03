@@ -3,7 +3,9 @@ use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
+use cpu::CpuCycle;
 use log::{debug, error, info};
+use ppu::PpuCycle;
 
 #[derive(Debug)]
 enum PRGBankMode {
@@ -103,7 +105,7 @@ impl CpuCartridgeAddressBus for MMC3PrgChip {
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+    fn write_byte(&mut self, address: u16, value: u8, _: PpuCycle) {
         info!("CPU write to MMC3 PRG bus {:04X}={:02X}", address, value);
 
         match address {
@@ -174,7 +176,7 @@ pub(crate) struct MMC3ChrChip {
     /// Track the cycle on which we last noticed an A12 change to low
     /// It takes 6 cycles at low voltage before a high voltage causes a counter decrement
     /// This is set to 0 whenever we see A12 high, if it was >=6 then we trigger a count
-    a12_cycles_at_last_low: Option<u32>,
+    a12_cycles_at_last_low: Option<PpuCycle>,
     /// IRQ register holding the value to load into the counter on the next reload
     irq_latch: u8,
     /// Set on reload to note that on the next rising edge the counter will get reloaded with the IRQ latch
@@ -256,21 +258,18 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
         val
     }
 
-    fn update_vram_address(&mut self, address: u16, ppu_cycles: u32) {
+    fn update_vram_address(&mut self, address: u16, cycles: PpuCycle) {
         if address < 0x2000 {
             let cycle_diff = match self.a12_cycles_at_last_low {
                 None => None,
-                Some(c) => Some(ppu_cycles - c),
+                Some(c) => Some(cycles - c),
             };
 
-            info!(
-                "MMC3 notified of PPU ADDR change {:04X} at cycle {}",
-                address, ppu_cycles
-            );
+            info!("MMC3 notified of PPU ADDR change {:04X} at cycle {}", address, cycles);
 
             self.a12_cycles_at_last_low = match (address & 0x1000 == 0x1000, cycle_diff) {
-                (false, _) => Some(ppu_cycles),
-                (true, Some(6..=u32::MAX)) => {
+                (false, _) => Some(cycles),
+                (true, Some(6..=PpuCycle::MAX)) => {
                     self.clock_irq_counter();
                     None
                 }
@@ -279,7 +278,7 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
         }
     }
 
-    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
+    fn read_byte(&mut self, address: u16, _: PpuCycle) -> u8 {
         match (address, &self.chr_data) {
             (0x0000..=0x03FF, ChrData::Ram(ram)) => ram[address as usize - 0x0000 + self.chr_bank_offsets[0]],
             (0x0400..=0x07FF, ChrData::Ram(ram)) => ram[address as usize - 0x0400 + self.chr_bank_offsets[1]],
@@ -308,7 +307,7 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+    fn write_byte(&mut self, address: u16, value: u8, _: PpuCycle) {
         debug!("MMC3 CHR write {:04X}={:02X}", address, value);
         match address {
             0x0000..=0x1FFF => {
@@ -336,7 +335,7 @@ impl PpuCartridgeAddressBus for MMC3ChrChip {
         }
     }
 
-    fn cpu_write_byte(&mut self, address: u16, value: u8, _: u32) {
+    fn cpu_write_byte(&mut self, address: u16, value: u8, _: CpuCycle) {
         debug!("CPU write to MMC3 CHR bus {:04X}={:02X}", address, value);
 
         match address {

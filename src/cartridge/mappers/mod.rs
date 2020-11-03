@@ -1,6 +1,8 @@
 use cartridge::mirroring::MirroringMode;
 use cartridge::{CpuCartridgeAddressBus, PpuCartridgeAddressBus};
+use cpu::CpuCycle;
 use log::debug;
+use ppu::PpuCycle;
 
 pub(super) mod cnrom; // Mapper 3
 pub(super) mod mmc1; // Mapper 1
@@ -65,7 +67,7 @@ impl CpuCartridgeAddressBus for BankedPrgChip {
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+    fn write_byte(&mut self, address: u16, value: u8, _: PpuCycle) {
         debug!("Mapper write {:04X}={:02X}", address, value);
 
         match address {
@@ -122,9 +124,9 @@ impl PpuCartridgeAddressBus for BankedChrChip {
         false
     }
 
-    fn update_vram_address(&mut self, _: u16, _: u32) {}
+    fn update_vram_address(&mut self, _: u16, _: PpuCycle) {}
 
-    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
+    fn read_byte(&mut self, address: u16, _: PpuCycle) -> u8 {
         match address {
             0x0000..=0x1FFF => match &self.chr_data {
                 ChrData::Rom(rom) => rom[address as usize + self.chr_bank_offset],
@@ -141,7 +143,7 @@ impl PpuCartridgeAddressBus for BankedChrChip {
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+    fn write_byte(&mut self, address: u16, value: u8, _: PpuCycle) {
         debug!("MMC1 CHR write {:04X}={:02X}", address, value);
         match address {
             0x0000..=0x1FFF => match &mut self.chr_data {
@@ -158,7 +160,7 @@ impl PpuCartridgeAddressBus for BankedChrChip {
         }
     }
 
-    fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: u32) {
+    fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: CpuCycle) {
         debug!(
             "CPU write to CHR bus {:04X}={:02X} at {:} cycles",
             address, value, cycles

@@ -40,6 +40,7 @@ rom_tests! {
     branch_timing_basics: (0xCAF7C * 3 as usize, 880592341, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("1.Branch_Basics.nes")),
     branch_timing_backward: (0xCAF7C * 3 as usize, 6166974, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("2.Backward_Branch.nes")),
     branch_timing_forward: (0xCAF7C * 3 as usize, 1293237708, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("3.Forward_Branch.nes")),
+    // cpu_interrupts:  (0xCAF7C * 3 as usize, 1293237708, Path::new(".").join("roms").join("test").join("cpu_interrupts_v2").join("cpu_interrupts.nes")), - Requires interrupt delay implemented
 
     // ----- General PPU Tests -----
     blargg_nes_ppu_test_palette_ram: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("palette_ram.nes")),

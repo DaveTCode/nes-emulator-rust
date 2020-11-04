@@ -58,7 +58,7 @@ rom_tests! {
 
     // ----- OAM Specific Tests -----
     oam_read: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("oam_read").join("oam_read.nes")),
-    // oam_stress: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("oam_read").join("oam_stress.nes")), - Not working, not sure why
+    oam_stress: (0x30E035C * 3 as usize, 2040203052, Path::new(".").join("roms").join("test").join("oam_read").join("oam_stress.nes")),
 
     // ----- VBL/NMI Timing Tests -----
     ppu_vbl_nmi_01_basics: (0x4FF06A * 3 as usize, 3760518270, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("01-vbl_basics.nes")),

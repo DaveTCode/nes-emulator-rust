@@ -216,6 +216,7 @@ impl Iterator for Apu {
             // Note that the timers are not clocked by the frame counter but on every apu cycle
             self.pulse_channel_1.clock_timer();
             self.pulse_channel_2.clock_timer();
+            self.noise_channel.clock_timer();
 
             if !self.frame_counter.inhibit_interrupts
                 && self.frame_counter.sequence_cycles == 0

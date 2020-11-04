@@ -136,7 +136,7 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
 
                 self.prg_rom[adj_addr + self.prg_bank_offsets[1] as usize]
             }
-            _ => todo!("Not yet mapped addresses in MMC1 {:04X}", address),
+            _ => 0x0,
         }
     }
 
@@ -177,7 +177,7 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
                     }
                 }
             }
-            _ => (), // TODO - Do writes to anywhere else do anything?
+            _ => (),
         }
     }
 }

@@ -205,14 +205,9 @@ impl super::Ppu {
         pattern_table_base: u16,
     ) {
         match cycle {
-            0 => self.sprite_data.secondary_oam_ram_pointer = 0,
             // Clear secondary OAM RAM
-            1..=64 => {
-                if cycle & 1 == 0 {
-                    self.sprite_data.secondary_oam_ram[self.sprite_data.secondary_oam_ram_pointer] = 0xFF;
-                    self.sprite_data.secondary_oam_ram_pointer += 1;
-                }
-            }
+            0 => (),
+            1..=64 => self.sprite_data.secondary_oam_ram[cycle as usize >> 2] = 0xFF,
             // Sprite evaluation
             65..=256 => {
                 // Skip sprite evaluation on pre-render

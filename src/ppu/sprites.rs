@@ -1,13 +1,7 @@
-use log::error;
+use log::info;
 
 pub(super) const MAX_SPRITES: usize = 64;
 pub(super) const MAX_SPRITES_PER_LINE: usize = 8;
-
-#[derive(Debug, Copy, Clone)]
-enum SpriteState {
-    SpriteEvaluation(SpriteEvaluation),
-    SpriteFetch(SpriteFetch),
-}
 
 #[derive(Debug, Copy, Clone)]
 enum SpriteEvaluation {
@@ -131,7 +125,14 @@ impl SpriteData {
     }
 
     pub(super) fn write_oam_data(&mut self, value: u8) {
-        self.oam_ram[self.oam_addr as usize] = value;
+        // Attribute byte bits always read 0, fix at set time to remove cost of masking on read
+        let masked_value = if self.oam_addr & 0b11 == 0b10 {
+            value & 0xE3
+        } else {
+            value
+        };
+
+        self.oam_ram[self.oam_addr as usize] = masked_value;
         self.oam_addr = self.oam_addr.wrapping_add(1);
     }
 
@@ -143,8 +144,11 @@ impl SpriteData {
     }
 
     pub(super) fn dma_write(&mut self, value: u8, dma_byte: u8) {
+        // Attribute byte bits always read 0, fix at set time to remove cost of masking on read
+        let masked_value = if dma_byte & 0b11 == 0b10 { value & 0xE3 } else { value };
+
         // Note that OAM DMA doesn't affect oam_addr
-        self.oam_ram[self.oam_addr.wrapping_add(dma_byte) as usize] = value;
+        self.oam_ram[self.oam_addr.wrapping_add(dma_byte) as usize] = masked_value;
     }
 }
 
@@ -260,6 +264,13 @@ impl super::Ppu {
                         // Check for sprite overflow
                         if self.sprite_data.secondary_oam_ram_pointer >= self.sprite_data.secondary_oam_ram.len() {
                             self.ppu_status.sprite_overflow = true;
+                            info!(
+                                "Setting sprite overflow flag to true at oam_addr {}, scanline {}, dot {}, cycle {}",
+                                self.sprite_data.oam_addr - 1,
+                                self.scanline_state.scanline,
+                                self.scanline_state.scanline_cycle,
+                                self.total_cycles
+                            );
                         }
 
                         SpriteEvaluation::ReadByte { count: 1 }

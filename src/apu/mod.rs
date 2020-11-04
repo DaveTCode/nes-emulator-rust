@@ -2,6 +2,8 @@ use apu::dmc_channel::DmcChannel;
 use apu::noise_channel::NoiseChannel;
 use apu::pulse_channel::PulseChannel;
 use apu::triangle_channel::TriangleChannel;
+use cpu::interrupts::Interrupt;
+use cpu::CpuCycle;
 use log::{debug, info};
 
 mod dmc_channel;
@@ -60,7 +62,7 @@ pub(crate) struct Apu {
     frame_counter: FrameCounter,
     total_apu_cycles: ApuCycle,
     is_apu_cycle: bool,
-    frame_interrupt: bool,
+    interrupt_triggered_cycles: Option<ApuCycle>,
 }
 
 impl Apu {
@@ -75,12 +77,12 @@ impl Apu {
                 inhibit_interrupts: false,
                 mode: FrameCounterMode::FourStep,
                 step: 0,
-                sequence_cycles: 0,
+                sequence_cycles: 4,
                 timer_reset_countdown: 0,
             },
             total_apu_cycles: 4, // TODO - What's the total number of APU cycles that occur during startup? 8/2?
             is_apu_cycle: false, // TODO - Guesswork, does the APU clock on cpu cycle 0 or 1?
-            frame_interrupt: false,
+            interrupt_triggered_cycles: None,
         }
     }
 
@@ -111,13 +113,25 @@ impl Apu {
         // TODO - Read length from DMC channel
 
         // TODO - Set DMC interrupt flag
-        if self.frame_interrupt {
+        if let Some(c) = self.interrupt_triggered_cycles {
             mask |= 0b0100_0000;
+
+            // Don't clear the flag if it was only just set
+            if self.total_apu_cycles - c > 1 {
+                self.interrupt_triggered_cycles = None;
+            }
         }
-        self.frame_interrupt = false;
 
         info!("Reading APU status register as {:02X}", mask);
         mask
+    }
+
+    pub(crate) fn check_trigger_irq(&mut self) -> bool {
+        if let Some(c) = self.interrupt_triggered_cycles {
+            self.total_apu_cycles - c > 4
+        } else {
+            false
+        }
     }
 
     pub(crate) fn read_byte(&mut self, address: u16) -> u8 {
@@ -153,9 +167,8 @@ impl Apu {
             0x4017 => {
                 self.frame_counter.set(value, self.is_apu_cycle);
                 if self.frame_counter.inhibit_interrupts {
-                    self.frame_interrupt = false;
+                    self.interrupt_triggered_cycles = None;
                 }
-                // TODO - Should reset timer (which one?) after 3-4 CPU cycles
 
                 if self.frame_counter.mode == FrameCounterMode::FiveStep {
                     self.half_frame();
@@ -200,18 +213,17 @@ impl Iterator for Apu {
             self.frame_counter.sequence_cycles =
                 (self.frame_counter.sequence_cycles + 1) % self.frame_counter.mode.wrapping_number();
 
-            // TODO - Do we also need to check for interrupts on the non-apu cycle to catch writes?
-            if !self.frame_counter.inhibit_interrupts
-                && (self.frame_counter.sequence_cycles == 14914 || self.frame_counter.sequence_cycles == 0)
-                && self.frame_counter.mode == FrameCounterMode::FourStep
-            {
-                // TODO - This doesn't actually trigger an IRQ yet
-                self.frame_interrupt = true;
-            }
-
             // Note that the timers are not clocked by the frame counter but on every apu cycle
             self.pulse_channel_1.clock_timer();
             self.pulse_channel_2.clock_timer();
+
+            if !self.frame_counter.inhibit_interrupts
+                && self.frame_counter.sequence_cycles == 0
+                && self.frame_counter.mode == FrameCounterMode::FourStep
+            {
+                info!("Triggering APU IRQ at apu cycle {}", self.total_apu_cycles);
+                self.interrupt_triggered_cycles = Some(self.total_apu_cycles);
+            }
 
             self.total_apu_cycles = self.total_apu_cycles.wrapping_add(1);
         } else {

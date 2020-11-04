@@ -31,8 +31,8 @@ rom_tests! {
     blargg_nes_cpu_test_official: (0x13399B3 * 3 as usize, 2605351162, Path::new(".").join("roms").join("test").join("blargg_nes_cpu_test5").join("official.nes")),
     instr_test_official_only: (0x33B7410 * 3 as usize, 216765697, Path::new(".").join("roms").join("test").join("instr_test-v3").join("official_only.nes")),
     cpu_timing_test: (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("cpu_timing_test6").join("cpu_timing_test.nes")),
-    // instr_misc:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_misc").join("instr_misc.nes")), - Requires APU length counter (singles up to that pass)
-    // instr_timing:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_timing").join("instr_timing.nes")), - Requires APU length counter
+    // instr_misc:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_misc").join("instr_misc.nes")), - Requires unofficial opcodes
+    // instr_timing:  (0x11EB284 * 3 as usize, 377355712, Path::new(".").join("roms").join("test").join("instr_timing").join("instr_timing.nes")), - Requires unofficial opcodes
     cpu_dummy_reads: (0x18F464 * 3 as usize, 2170164011, Path::new(".").join("roms").join("test").join("cpu_dummy_reads").join("cpu_dummy_reads.nes")),
     cpu_dummy_writes_oam: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_writes").join("cpu_dummy_writes_oam.nes")),
     // cpu_dummy_writes_ppumem: (0xB45D59 * 3 as usize, 3847704951, Path::new(".").join("roms").join("test").join("cpu_dummy_writes").join("cpu_dummy_writes_ppumem.nes")), # Opcodes are fine but open bus behaviour is wrong apparently
@@ -80,16 +80,7 @@ rom_tests! {
     vbl_nmi_timing_nmi_timing: (0x3C6634 * 3 as usize, 4107311669, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("7.nmi_timing.nes")),
 
     // ----- Sprite Zero Hit Tests -----
-    sprite_zero_hit_01_basics: (0x1DF406 * 3 as usize, 2445173019, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("01-basics.nes")),
-    sprite_zero_hit_02_alignment: (0x1DF406 * 3 as usize, 901509059, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("02-alignment.nes")),
-    sprite_zero_hit_03_corners: (0x1DF406 * 3 as usize, 218094906, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("03-corners.nes")),
-    sprite_zero_hit_04_flip: (0x1DF406 * 3 as usize, 3268146222, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("04-flip.nes")),
-    sprite_zero_hit_05_left_clip: (0x14DD6D * 3 as usize, 343554750, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("05-left_clip.nes")),
-    sprite_zero_hit_06_right_edge: (0x1DF406 * 3 as usize, 2932966414, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("06-right_edge.nes")),
-    sprite_zero_hit_07_screen_bottom: (0x15C616 * 3 as usize, 1824463657, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("07-screen_bottom.nes")),
-    sprite_zero_hit_08_double_height: (0x1DF406 * 3 as usize, 3281055842, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("08-double_height.nes")),
-    sprite_zero_hit_09_timing: (0x5BC0FC * 3 as usize, 1855578835, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("09-timing.nes")),
-    sprite_zero_hit_10_timing_order: (0x2450AB * 3 as usize, 2111091809, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("rom_singles").join("10-timing_order.nes")),
+    sprite_zero_hit_all: (0x10E56CB * 3 as usize, 1340789466, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("ppu_sprite_hit.nes")),
 
     // ----- Sprite Overflow Tests
     sprite_overflow_01_basics: (0x1BAE60 * 3 as usize, 2445173019, Path::new(".").join("roms").join("test").join("ppu_sprite_overflow").join("rom_singles").join("01-basics.nes")),
@@ -130,11 +121,22 @@ rom_tests! {
     apu_test_1_length_counter: (0x1551B8 * 3 as usize, 1135491406, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("1-len_ctr.nes")),
     apu_test_2_length_table: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("2-len_table.nes")),
     apu_test_3_irq_flag: (0x1D7FA9 * 3 as usize, 902361631, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("3-irq_flag.nes")),
-    //apu_test_4_jitter: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("4-jitter.nes")), // Frame IRQ is set too soon
-    //apu_test_5_length_timing: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("5-len_timing.nes")), Failed #7 on channel 0
-    //apu_test_6_irq_flag_timing: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("6-irq_flag_timing.nes")), // Frame IRQ isn't really set yet
+    apu_test_4_jitter: (0x18F45C * 3 as usize, 2672842930, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("4-jitter.nes")),
+    apu_test_5_length_timing: (0x3B7D82 * 3 as usize, 1825584722, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("5-len_timing.nes")),
+    apu_test_6_irq_flag_timing: (0x146910 * 3 as usize, 1222179157, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("6-irq_flag_timing.nes")),
     //apu_test_7_dmc_basics: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("7-dmc_basics.nes")), // DMC channel not implemented
     //apu_test_8_dmc_rates: (0x1AC5AD * 3 as usize, 1850311913, Path::new(".").join("roms").join("test").join("apu_test").join("rom_singles").join("8-dmc_rates.nes")), // DMC channel not implemented
+    apu_test_01_length_counter: (0x1551B9 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("01.len_ctr.nes")),
+    apu_test_02_length_table: (0x10C66A * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("02.len_table.nes")),
+    apu_test_03_irq_flag: (0x163A61 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("03.irq_flag.nes")),
+    apu_test_04_clock_jitter: (0x163A61 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("04.clock_jitter.nes")),
+    apu_test_05_len_timing_mode0: (0x163A62 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("05.len_timing_mode0.nes")),
+    apu_test_06_len_timing_mode1: (0x163A62 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("06.len_timing_mode1.nes")),
+    apu_test_07_irq_flag_timing: (0x163A62 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("07.irq_flag_timing.nes")),
+    //apu_test_08_irq_timing: (0x163A62 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("08.irq_timing.nes")), - IRQ happening too soon
+    apu_test_09_reset_timing: (0xF696D * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("09.reset_timing.nes")), // Suspect. I haven't even implemented reset anywhere!
+    // apu_test_10_len_halt_timing: (0xF696D * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("10.len_halt_timing.nes")), // Failing #03
+    // apu_test_11_len_reload_timing: (0xF696D * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_apu_2005.07.30").join("11.len_reload_timing.nes")), // Failing #04
 }
 
 const ASCII_GRAYSCALE_ARRAY: [char; 96] = [

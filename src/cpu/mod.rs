@@ -1002,7 +1002,7 @@ impl<'a> Cpu<'a> {
                 .registers
                 .status_register
                 .contains(StatusFlags::INTERRUPT_DISABLE_FLAG)
-                && self.ppu.check_trigger_irq()
+                && (self.ppu.check_trigger_irq() || self.apu.check_trigger_irq())
             {
                 self.state = State::Interrupt(InterruptState::InternalOps1(Interrupt::IRQ(self.cycles * 3)));
 
@@ -1012,7 +1012,7 @@ impl<'a> Cpu<'a> {
                 self.trigger_dma = false;
                 self.state = State::Dma(DmaState::DummyCycle);
 
-                info!("Starting DMA transfer");
+                info!("Starting DMA transfer from {:04X}", self.dma_address);
             }
         }
 

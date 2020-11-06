@@ -6,7 +6,7 @@ use cpu::InterruptState;
 use cpu::State;
 use log::error;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(super) struct Opcode {
     pub(super) opcode: u8,
     pub(super) operation: Operation,
@@ -56,6 +56,7 @@ impl Opcode {
 
         match self.operation {
             Operation::ADC => {
+                cpu.poll_for_interrupts(true);
                 cpu.adc(operand.unwrap());
                 State::Cpu(CpuState::FetchOpcode)
             }
@@ -63,6 +64,7 @@ impl Opcode {
             Operation::ALR => todo!(),
             Operation::ANC => todo!(),
             Operation::AND => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.a &= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::Cpu(CpuState::FetchOpcode)
@@ -77,6 +79,7 @@ impl Opcode {
 
                 match self.address_mode {
                     AddressingMode::Accumulator => {
+                        cpu.poll_for_interrupts(true);
                         cpu.registers.a = result;
                         State::Cpu(CpuState::FetchOpcode)
                     }
@@ -97,8 +100,10 @@ impl Opcode {
             | Operation::BVC
             | Operation::BVS => State::Cpu(CpuState::SetProgramCounter {
                 address: address.unwrap(),
+                was_branch_instruction: true,
             }),
             Operation::BIT => {
+                cpu.poll_for_interrupts(true);
                 let result = cpu.registers.a & operand.unwrap();
                 cpu.registers.status_register.set(StatusFlags::ZERO_FLAG, result == 0);
                 cpu.registers
@@ -111,32 +116,39 @@ impl Opcode {
             }
             Operation::BRK => State::Interrupt(InterruptState::PushPCH(Interrupt::IRQ_BRK(0))),
             Operation::CLC => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.status_register.remove(StatusFlags::CARRY_FLAG);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::CLD => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.status_register.remove(StatusFlags::DECIMAL_FLAG);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::CLI => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers
                     .status_register
                     .remove(StatusFlags::INTERRUPT_DISABLE_FLAG);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::CLV => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.status_register.remove(StatusFlags::OVERFLOW_FLAG);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::CMP => {
+                cpu.poll_for_interrupts(true);
                 cpu.compare(operand.unwrap(), cpu.registers.a);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::CPX => {
+                cpu.poll_for_interrupts(true);
                 cpu.compare(operand.unwrap(), cpu.registers.x);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::CPY => {
+                cpu.poll_for_interrupts(true);
                 cpu.compare(operand.unwrap(), cpu.registers.y);
                 State::Cpu(CpuState::FetchOpcode)
             }
@@ -154,6 +166,7 @@ impl Opcode {
 
                 match self.address_mode {
                     AddressingMode::Accumulator => {
+                        cpu.poll_for_interrupts(true);
                         cpu.registers.a = result;
                         State::Cpu(CpuState::FetchOpcode)
                     }
@@ -165,14 +178,17 @@ impl Opcode {
                 }
             }
             Operation::DEX => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.x = cpu.decrement(cpu.registers.x);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::DEY => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.y = cpu.decrement(cpu.registers.y);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::EOR => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.a ^= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::Cpu(CpuState::FetchOpcode)
@@ -182,6 +198,7 @@ impl Opcode {
 
                 match self.address_mode {
                     AddressingMode::Accumulator => {
+                        cpu.poll_for_interrupts(true);
                         cpu.registers.a = result;
                         State::Cpu(CpuState::FetchOpcode)
                     }
@@ -193,10 +210,12 @@ impl Opcode {
                 }
             }
             Operation::INX => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.x = cpu.increment(cpu.registers.x);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::INY => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.y = cpu.increment(cpu.registers.y);
                 State::Cpu(CpuState::FetchOpcode)
             }
@@ -211,6 +230,7 @@ impl Opcode {
                 })
             }
             Operation::JMP => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.program_counter = address.unwrap();
                 State::Cpu(CpuState::FetchOpcode)
             }
@@ -224,22 +244,26 @@ impl Opcode {
             }
             Operation::LAS => todo!(),
             Operation::LAX => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.a = operand.unwrap();
                 cpu.registers.x = operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::LDA => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.a = operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::LDX => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.x = operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.x);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::LDY => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.y = operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.y);
                 State::Cpu(CpuState::FetchOpcode)
@@ -253,6 +277,7 @@ impl Opcode {
 
                 match self.address_mode {
                     AddressingMode::Accumulator => {
+                        cpu.poll_for_interrupts(true);
                         cpu.registers.a = result;
                         State::Cpu(CpuState::FetchOpcode)
                     }
@@ -263,14 +288,22 @@ impl Opcode {
                     }),
                 }
             }
-            Operation::NOP => State::Cpu(CpuState::FetchOpcode),
+            Operation::NOP => {
+                cpu.poll_for_interrupts(true);
+                State::Cpu(CpuState::FetchOpcode)
+            }
             Operation::ORA => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.a |= operand.unwrap();
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::Cpu(CpuState::FetchOpcode)
             }
-            Operation::PHA => State::Cpu(CpuState::PushRegisterOnStack { value: cpu.registers.a }),
+            Operation::PHA => {
+                cpu.poll_for_interrupts(true);
+                State::Cpu(CpuState::PushRegisterOnStack { value: cpu.registers.a })
+            }
             Operation::PHP => {
+                cpu.poll_for_interrupts(true);
                 // Note that we mask bits 4, 5 here as this is called from an instruction
                 State::Cpu(CpuState::PushRegisterOnStack {
                     value: cpu.registers.status_register.bits() | 0b0011_0000,
@@ -295,6 +328,7 @@ impl Opcode {
 
                 match self.address_mode {
                     AddressingMode::Accumulator => {
+                        cpu.poll_for_interrupts(true);
                         cpu.registers.a = result;
                         State::Cpu(CpuState::FetchOpcode)
                     }
@@ -317,6 +351,7 @@ impl Opcode {
 
                 match self.address_mode {
                     AddressingMode::Accumulator => {
+                        cpu.poll_for_interrupts(true);
                         cpu.registers.a = result;
                         State::Cpu(CpuState::FetchOpcode)
                     }
@@ -339,6 +374,7 @@ impl Opcode {
 
                 match self.address_mode {
                     AddressingMode::Accumulator => {
+                        cpu.poll_for_interrupts(true);
                         cpu.registers.a = result;
                         State::Cpu(CpuState::FetchOpcode)
                     }
@@ -361,6 +397,7 @@ impl Opcode {
 
                 match self.address_mode {
                     AddressingMode::Accumulator => {
+                        cpu.poll_for_interrupts(true);
                         cpu.registers.a = result;
                         State::Cpu(CpuState::FetchOpcode)
                     }
@@ -383,18 +420,22 @@ impl Opcode {
                 dummy: false,
             }),
             Operation::SBC => {
+                cpu.poll_for_interrupts(true);
                 cpu.adc(!operand.unwrap());
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::SEC => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.status_register.insert(StatusFlags::CARRY_FLAG);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::SED => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.status_register.insert(StatusFlags::DECIMAL_FLAG);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::SEI => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers
                     .status_register
                     .insert(StatusFlags::INTERRUPT_DISABLE_FLAG);
@@ -447,30 +488,36 @@ impl Opcode {
             }),
             Operation::TAS => todo!(),
             Operation::TAX => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.x = cpu.registers.a;
                 cpu.set_negative_zero_flags(cpu.registers.x);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::TAY => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.y = cpu.registers.a;
                 cpu.set_negative_zero_flags(cpu.registers.y);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::TSX => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.x = cpu.registers.stack_pointer;
                 cpu.set_negative_zero_flags(cpu.registers.x);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::TXA => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.a = cpu.registers.x;
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::TXS => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.stack_pointer = cpu.registers.x;
                 State::Cpu(CpuState::FetchOpcode)
             }
             Operation::TYA => {
+                cpu.poll_for_interrupts(true);
                 cpu.registers.a = cpu.registers.y;
                 cpu.set_negative_zero_flags(cpu.registers.a);
                 State::Cpu(CpuState::FetchOpcode)
@@ -480,7 +527,7 @@ impl Opcode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(super) enum InstructionType {
     Read,
     ReadModifyWrite,
@@ -491,14 +538,14 @@ pub(super) enum InstructionType {
     NoMemoryAccess,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(super) enum InstructionLength {
     One,
     Two,
     Three,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub(super) enum AddressingMode {
     Accumulator,
     Absolute,

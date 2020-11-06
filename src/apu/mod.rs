@@ -91,9 +91,7 @@ impl Apu {
         self.pulse_channel_2.set_enabled(value & 0b10 != 0);
         self.triangle_channel.set_enabled(value & 0b100 != 0);
         self.noise_channel.set_enabled(value & 0b1000 != 0);
-        if value & 0b1_0000 == 0 {
-            self.dmc_channel.disable();
-        }
+        self.dmc_channel.set_enabled(value & 0b1_0000 != 0);
     }
 
     fn read_status_register(&mut self) -> u8 {
@@ -110,7 +108,7 @@ impl Apu {
         if self.noise_channel.non_zero_length_counter() {
             mask |= 0b1000
         };
-        // TODO - Read length from DMC channel
+        // TODO - Read active flag from DMC channel
 
         // TODO - Set DMC interrupt flag
         if let Some(c) = self.interrupt_triggered_cycles {
@@ -162,7 +160,11 @@ impl Apu {
             0x400D => {} // Unused
             0x400E => self.noise_channel.set_mode_and_period(value),
             0x400F => self.noise_channel.load_length_counter(value),
-            0x4010..=0x4014 => {} // TODO - DMC channel
+            0x4010 => self.dmc_channel.write_flag_and_rate(value),
+            0x4011 => self.dmc_channel.direct_load(value),
+            0x4012 => self.dmc_channel.set_sample_address(value),
+            0x4013 => self.dmc_channel.set_sample_length(value),
+            0x4014 => panic!("4014 isn't mapped to the APU"),
             0x4015 => self.write_status_register(value),
             0x4017 => {
                 self.frame_counter.set(value, self.is_apu_cycle);

@@ -40,7 +40,8 @@ rom_tests! {
     branch_timing_basics: (0xCAF7C * 3 as usize, 880592341, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("1.Branch_Basics.nes")),
     branch_timing_backward: (0xCAF7C * 3 as usize, 6166974, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("2.Backward_Branch.nes")),
     branch_timing_forward: (0xCAF7C * 3 as usize, 1293237708, Path::new(".").join("roms").join("test").join("branch_timing_tests").join("3.Forward_Branch.nes")),
-    // cpu_interrupts:  (0xCAF7C * 3 as usize, 1293237708, Path::new(".").join("roms").join("test").join("cpu_interrupts_v2").join("cpu_interrupts.nes")), - Requires interrupt delay implemented
+    cpu_interrupts_1_cli_delay:  (0x8987A * 3 as usize, 459637199, Path::new(".").join("roms").join("test").join("cpu_interrupts_v2").join("rom_singles").join("1-cli_latency.nes")),
+    //cpu_interrupts_2_nmi_brk:  (0x138066 * 3 as usize, 459637199, Path::new(".").join("roms").join("test").join("cpu_interrupts_v2").join("rom_singles").join("2-nmi_and_brk.nes")),
 
     // ----- General PPU Tests -----
     blargg_nes_ppu_test_palette_ram: (0xD23D0 * 3 as usize, 1300901188, Path::new(".").join("roms").join("test").join("blargg_ppu_tests_2005.09.15b").join("palette_ram.nes")),
@@ -59,7 +60,7 @@ rom_tests! {
 
     // ----- OAM Specific Tests -----
     oam_read: (0x1C22B4 * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("oam_read").join("oam_read.nes")),
-    oam_stress: (0x30E035C * 3 as usize, 2040203052, Path::new(".").join("roms").join("test").join("oam_read").join("oam_stress.nes")),
+    oam_stress: (0x30E035C * 3 as usize, 2040203052, Path::new(".").join("roms").join("test").join("oam_stress").join("oam_stress.nes")),
 
     // ----- VBL/NMI Timing Tests -----
     ppu_vbl_nmi_01_basics: (0x4FF06A * 3 as usize, 3760518270, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("01-vbl_basics.nes")),
@@ -71,7 +72,7 @@ rom_tests! {
     ppu_vbl_nmi_07_nmi_on_timing: (0x5EEF57 * 3 as usize, 1516309785, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("07-nmi_on_timing.nes")),
     ppu_vbl_nmi_08_nmi_off_timing: (0x6791A1 * 3 as usize, 2373747886, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("08-nmi_off_timing.nes")),
     ppu_vbl_nmi_09_even_odd_frames: (0x43AB75 * 3 as usize, 817319831, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("09-even_odd_frames.nes")),
-    // ppu_vbl_nmi_10_even_odd_timing: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("10-even_odd_timing.nes")), - Failed #3 Clock is skipped too late
+    // ppu_vbl_nmi_10_even_odd_timing: (0x4FF06A * 3 as usize, 3764449243, Path::new(".").join("roms").join("test").join("ppu_vbl_nmi").join("rom_singles").join("10-even_odd_timing.nes")), - Failed #3 Clock is skipped too late relative to enabling bg
     vbl_nmi_timing_frame_basics: (0x5CA9A1 * 3 as usize, 3792590752, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("1.frame_basics.nes")),
     vbl_nmi_timing_vbl_timing: (0x51C1BF * 3 as usize, 839309104, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("2.vbl_timing.nes")),
     vbl_nmi_timing_even_odd_frames: (0x3A94DF * 3 as usize, 3404062440, Path::new(".").join("roms").join("test").join("vbl_nmi_timing").join("3.even_odd_frames.nes")),

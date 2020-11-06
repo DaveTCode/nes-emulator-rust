@@ -120,7 +120,7 @@ impl BankedChrChip {
 }
 
 impl PpuCartridgeAddressBus for BankedChrChip {
-    fn check_trigger_irq(&mut self) -> bool {
+    fn check_trigger_irq(&mut self, _: bool) -> bool {
         false
     }
 

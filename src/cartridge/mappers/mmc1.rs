@@ -281,7 +281,7 @@ impl MMC1ChrChip {
 }
 
 impl PpuCartridgeAddressBus for MMC1ChrChip {
-    fn check_trigger_irq(&mut self) -> bool {
+    fn check_trigger_irq(&mut self, _: bool) -> bool {
         false
     }
 

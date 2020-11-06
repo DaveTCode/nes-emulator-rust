@@ -215,8 +215,8 @@ impl Ppu {
         }
     }
 
-    pub(crate) fn check_trigger_irq(&mut self) -> bool {
-        self.chr_address_bus.check_trigger_irq()
+    pub(crate) fn check_trigger_irq(&mut self, clear: bool) -> bool {
+        self.chr_address_bus.check_trigger_irq(clear)
     }
 
     pub(crate) fn dump_state(&mut self, vram_copy: &mut [u8; 0x4000]) -> &[u8; 0x100] {
@@ -227,14 +227,16 @@ impl Ppu {
         &self.sprite_data.oam_ram
     }
 
-    pub(crate) fn consume_ppu_nmi(&mut self) -> Option<Interrupt> {
+    pub(crate) fn check_ppu_nmi(&mut self, clear: bool) -> Option<Interrupt> {
         if let Some(Interrupt::NMI(cycles)) = self.nmi_interrupt {
             // Due to us checking for interrupts _after_ the last operation we might catch an interrupt
             // a CPU instruction early (STA 2002 can cause an NMI, last cycle of STA is the write, should have
             // checked for interrupts first but instead we check whether the interrupt occurred in the last 3 PPU
             // cycles.
             if cycles <= self.total_cycles - 3 {
-                self.nmi_interrupt = None;
+                if clear {
+                    self.nmi_interrupt = None;
+                }
                 return Some(Interrupt::NMI(cycles));
             }
         }
@@ -685,7 +687,7 @@ mod ppu_tests {
     struct FakeCartridge {}
 
     impl PpuCartridgeAddressBus for FakeCartridge {
-        fn check_trigger_irq(&mut self) -> bool {
+        fn check_trigger_irq(&mut self, _: bool) -> bool {
             false
         }
 

@@ -98,6 +98,7 @@ enum CpuState {
     },
     SetProgramCounter {
         address: u16,
+        was_branch_instruction: bool,
     },
     WritingResult {
         address: u16,
@@ -120,6 +121,7 @@ pub(crate) struct Cpu<'a> {
     prg_address_bus: Box<dyn CpuCartridgeAddressBus>,
     trigger_dma: bool,
     dma_address: u16,
+    polled_interrupt: Option<Interrupt>,
 }
 
 impl<'a> Cpu<'a> {
@@ -136,7 +138,7 @@ impl<'a> Cpu<'a> {
         Cpu {
             state: State::Cpu(CpuState::FetchOpcode),
             registers: Registers::new(pc),
-            cycles: 0,
+            cycles: 8,
             cpu_cycle_counter: 1,
             ram: [0; 0x800],
             apu,
@@ -145,6 +147,7 @@ impl<'a> Cpu<'a> {
             prg_address_bus,
             trigger_dma: false,
             dma_address: 0x0000,
+            polled_interrupt: None,
         }
     }
 
@@ -200,8 +203,29 @@ impl<'a> Cpu<'a> {
             self.registers.stack_pointer,
             self.ppu.current_scanline_cycle(),
             self.ppu.current_scanline(),
-            self.cycles + 8 // TODO - Why do cycle counts start at 8? Startup process?
+            self.cycles
         )
+    }
+
+    /// This routine simulates checking for IRQ/NMI and happens during the last
+    /// cycle of an instruction based on the state of the registers at the
+    /// _start_ of that instruction
+    fn poll_for_interrupts(&mut self, clear_lines: bool) {
+        // NMI takes precedence over an IRQ
+        if let Some(interrupt) = self.ppu.check_ppu_nmi(clear_lines) {
+            self.polled_interrupt = Some(interrupt);
+
+            info!("Starting NMI interrupt");
+        } else if !self
+            .registers
+            .status_register
+            .contains(StatusFlags::INTERRUPT_DISABLE_FLAG)
+            && (self.ppu.check_trigger_irq(clear_lines) || self.apu.check_trigger_irq())
+        {
+            self.polled_interrupt = Some(Interrupt::IRQ(self.cycles * 3));
+
+            info!("Starting IRQ interrupt triggered by PPU");
+        }
     }
 
     fn push_to_stack(&mut self, value: u8) {
@@ -403,6 +427,8 @@ impl<'a> Cpu<'a> {
     }
 
     fn step_interrupt_handler(&mut self, state: InterruptState) -> State {
+        info!("Interrupt state: {:?} at cycle {}", state, self.cycles);
+
         match state {
             InterruptState::InternalOps1(i) => State::Interrupt(InterruptState::InternalOps2(i)),
             InterruptState::InternalOps2(i) => State::Interrupt(InterruptState::PushPCH(i)),
@@ -413,27 +439,40 @@ impl<'a> Cpu<'a> {
             }
             InterruptState::PushPCL(i) => {
                 self.push_to_stack(self.registers.program_counter as u8);
-
                 State::Interrupt(InterruptState::PushStatusRegister(i))
             }
             InterruptState::PushStatusRegister(i) => {
+                self.poll_for_interrupts(false);
+
+                // Since we've just polled for interrupts this may affect which interrupt is now actually executed
+                // NMI overrides BRK & IRQ,
+                // IRQ overrides BRK
+                let i = match (i, self.polled_interrupt) {
+                    (_, None) => i,
+                    (Interrupt::NMI(_), _) => i,
+                    (Interrupt::RESET(_), _) => i,
+                    (Interrupt::IRQ_BRK(_), Some(interrupt)) => {
+                        info!("Interrupt {:?} overrode {:?}", interrupt, i);
+                        interrupt
+                    }
+                    (Interrupt::IRQ(_), Some(interrupt)) => {
+                        info!("Interrupt {:?} overrode {:?}", interrupt, i);
+                        interrupt
+                    }
+                };
+                self.polled_interrupt = None;
+
                 self.push_to_stack(match i {
                     Interrupt::IRQ_BRK(_) => self.registers.status_register.bits() | 0b0011_0000,
                     _ => (self.registers.status_register.bits() | 0b0010_0000) & 0b1110_1111,
                 });
 
-                // Set interrupt disable at this point, whether this is a BRK or normal IRQ
+                // Set interrupt disable at this point, whether this is NMI, BRK or normal IRQ
                 self.registers
                     .status_register
                     .insert(StatusFlags::INTERRUPT_DISABLE_FLAG);
 
-                // Higher priority interrupts can override lower priority ones
-                // at this point, specifically an NMI can override a BRK/IRQ
-                if let Some(interrupt) = self.ppu.consume_ppu_nmi() {
-                    State::Interrupt(InterruptState::PullIRQVecHigh(interrupt))
-                } else {
-                    State::Interrupt(InterruptState::PullIRQVecHigh(i))
-                }
+                State::Interrupt(InterruptState::PullIRQVecHigh(i))
             }
             InterruptState::PullIRQVecHigh(i) => {
                 self.registers.program_counter = self.read_byte(i.offset()) as u16;
@@ -701,7 +740,7 @@ impl<'a> Cpu<'a> {
                         }
                     }
                     AddressingMode::Relative => {
-                        // Cycle 1 - Get the relative index and store it in the operand for use in the instruction (it'll be a signed 8 bit relative index)
+                        // Cycle 2 - Get the relative index and store it in the operand for use in the instruction (it'll be a signed 8 bit relative index)
                         let relative_operand = self.read_and_inc_program_counter();
 
                         let branch = match opcode.operation {
@@ -881,11 +920,13 @@ impl<'a> Cpu<'a> {
             },
             CpuState::PullRegisterFromStack { operation } => match operation {
                 Operation::PLA => {
+                    self.poll_for_interrupts(true);
                     self.registers.a = self.pop_from_stack();
                     self.set_negative_zero_flags(self.registers.a);
                     State::Cpu(CpuState::FetchOpcode)
                 }
                 Operation::PLP => {
+                    self.poll_for_interrupts(true);
                     self.registers.status_register =
                         StatusFlags::from_bits_truncate(self.pop_from_stack() & 0b1100_1111);
 
@@ -909,11 +950,15 @@ impl<'a> Cpu<'a> {
 
                 match operation {
                     Operation::RTS => State::Cpu(CpuState::IncrementProgramCounter),
-                    Operation::RTI => State::Cpu(CpuState::FetchOpcode),
+                    Operation::RTI => {
+                        self.poll_for_interrupts(true);
+                        State::Cpu(CpuState::FetchOpcode)
+                    }
                     _ => panic!("Attempt to access stack from invalid instruction {:?}", operation),
                 }
             }
             CpuState::IncrementProgramCounter => {
+                self.poll_for_interrupts(true);
                 self.registers.program_counter = self.registers.program_counter.wrapping_add(1);
 
                 State::Cpu(CpuState::FetchOpcode)
@@ -926,9 +971,16 @@ impl<'a> Cpu<'a> {
             CpuState::WritePCLToStack { address } => {
                 self.push_to_stack((self.registers.program_counter.wrapping_sub(1) & 0xFF) as u8);
 
-                State::Cpu(CpuState::SetProgramCounter { address })
+                State::Cpu(CpuState::SetProgramCounter {
+                    address,
+                    was_branch_instruction: false,
+                })
             }
-            CpuState::SetProgramCounter { address } => {
+            CpuState::SetProgramCounter {
+                address,
+                was_branch_instruction,
+            } => {
+                self.poll_for_interrupts(true);
                 self.registers.program_counter = address;
 
                 State::Cpu(CpuState::FetchOpcode)
@@ -952,6 +1004,9 @@ impl<'a> Cpu<'a> {
                 address,
                 dummy: false,
             } => {
+                // Crucially this _must_ happen before the write_byte.
+                self.poll_for_interrupts(true);
+
                 self.write_byte(address, value);
 
                 State::Cpu(CpuState::FetchOpcode)
@@ -962,8 +1017,14 @@ impl<'a> Cpu<'a> {
     /// When the CPU is paused for DMA this steps the CPU by a single clock
     fn step_dma_handler(&mut self, state: DmaState) -> State {
         match state {
-            // TODO - Handle extra +1 cycle on odd CPU cycle
-            DmaState::DummyCycle => State::Dma(DmaState::ReadCycle),
+            DmaState::DummyCycle => {
+                info!("Starting DMA on cycle {} from {:04X}", self.cycles, self.dma_address);
+                if self.cycles & 1 == 1 {
+                    State::Dma(DmaState::OddCpuCycle)
+                } else {
+                    State::Dma(DmaState::ReadCycle)
+                }
+            }
             DmaState::OddCpuCycle => State::Dma(DmaState::ReadCycle),
             DmaState::ReadCycle => {
                 let value = self.read_byte(self.dma_address);
@@ -975,6 +1036,7 @@ impl<'a> Cpu<'a> {
                 self.ppu.write_dma_byte(value, (self.dma_address - 1) as u8);
 
                 if self.dma_address & 0x100 == 0x100 {
+                    error!("Finished DMA on cycle {}", self.cycles);
                     State::Cpu(CpuState::FetchOpcode)
                 } else {
                     State::Dma(DmaState::ReadCycle)
@@ -992,21 +1054,10 @@ impl<'a> Cpu<'a> {
         };
 
         if let State::Cpu(CpuState::FetchOpcode) = self.state {
-            // Check for interrupts after completion of previous operation
-            // BEFORE reading next opcode
-            if let Some(interrupt) = self.ppu.consume_ppu_nmi() {
+            if let Some(interrupt) = self.polled_interrupt {
+                self.polled_interrupt = None;
+
                 self.state = State::Interrupt(InterruptState::InternalOps1(interrupt));
-
-                info!("Starting NMI interrupt");
-            } else if !self
-                .registers
-                .status_register
-                .contains(StatusFlags::INTERRUPT_DISABLE_FLAG)
-                && (self.ppu.check_trigger_irq() || self.apu.check_trigger_irq())
-            {
-                self.state = State::Interrupt(InterruptState::InternalOps1(Interrupt::IRQ(self.cycles * 3)));
-
-                info!("Starting IRQ interrupt triggered by PPU");
             } else if self.trigger_dma {
                 // Also check whether we're starting DMA on the next cycle
                 self.trigger_dma = false;

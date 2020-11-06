@@ -250,10 +250,12 @@ impl MMC3ChrChip {
 }
 
 impl PpuCartridgeAddressBus for MMC3ChrChip {
-    fn check_trigger_irq(&mut self) -> bool {
+    fn check_trigger_irq(&mut self, clear: bool) -> bool {
         let val = self.irq_triggered;
 
-        self.irq_triggered = false;
+        if clear {
+            self.irq_triggered = false;
+        }
 
         val
     }

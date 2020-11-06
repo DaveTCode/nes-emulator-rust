@@ -85,11 +85,7 @@ rom_tests! {
     sprite_zero_hit_all: (0x10E56CB * 3 as usize, 1340789466, Path::new(".").join("roms").join("test").join("ppu_sprite_hit").join("ppu_sprite_hit.nes")),
 
     // ----- Sprite Overflow Tests
-    sprite_overflow_01_basics: (0x1BAE60 * 3 as usize, 2445173019, Path::new(".").join("roms").join("test").join("ppu_sprite_overflow").join("rom_singles").join("01-basics.nes")),
-    sprite_overflow_02_details: (0x146918 * 3 as usize, 3107147523, Path::new(".").join("roms").join("test").join("ppu_sprite_overflow").join("rom_singles").join("02-details.nes")),
-    //sprite_overflow_03_timing: (0x1BAE60 * 3 as usize, 2445173019, Path::new(".").join("roms").join("test").join("ppu_sprite_overflow").join("rom_singles").join("03-timing.nes")),
-    sprite_overflow_04_obscure: (0x130C1C * 3 as usize, 1075496939, Path::new(".").join("roms").join("test").join("ppu_sprite_overflow").join("rom_singles").join("04-obscure.nes")),
-    sprite_overflow_05_emulator: (0x1BAE60 * 3 as usize, 1262883020, Path::new(".").join("roms").join("test").join("ppu_sprite_overflow").join("rom_singles").join("05-emulator.nes")),
+    sprite_overflow: (0xDAFD85 * 3 as usize, 1808572613, Path::new(".").join("roms").join("test").join("ppu_sprite_overflow").join("ppu_sprite_overflow.nes")),
 
     // ----- Mapper Tests -----
     mapper_0_p32k_c8k_v: (0x56A32 * 3 as usize, 1942926564, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M0_P32K_C8K_V.nes")),

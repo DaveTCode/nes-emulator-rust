@@ -253,20 +253,20 @@ impl super::Ppu {
                     // Start moving this sprite into OAMRAM
                     self.sprite_data.secondary_oam_ram_pointer += 1;
 
+                    // Check for sprite overflow
+                    if self.sprite_data.secondary_oam_ram_pointer >= self.sprite_data.secondary_oam_ram.len() {
+                        self.ppu_status.sprite_overflow = true;
+                        info!(
+                            "Setting sprite overflow flag to true at oam_addr {}, scanline {}, dot {}, cycle {}",
+                            self.sprite_data.oam_addr,
+                            self.scanline_state.scanline,
+                            self.scanline_state.dot,
+                            self.total_cycles
+                        );
+                    }
+
                     if (self.sprite_data.oam_addr as usize + 1) < self.sprite_data.oam_ram.len() {
                         self.sprite_data.oam_addr += 1;
-
-                        // Check for sprite overflow
-                        if self.sprite_data.secondary_oam_ram_pointer >= self.sprite_data.secondary_oam_ram.len() {
-                            self.ppu_status.sprite_overflow = true;
-                            info!(
-                                "Setting sprite overflow flag to true at oam_addr {}, scanline {}, dot {}, cycle {}",
-                                self.sprite_data.oam_addr - 1,
-                                self.scanline_state.scanline,
-                                self.scanline_state.dot,
-                                self.total_cycles
-                            );
-                        }
 
                         SpriteEvaluation::ReadByte { count: 1 }
                     } else {

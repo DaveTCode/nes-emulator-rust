@@ -25,7 +25,7 @@ struct ScanlineState {
     bg_low_byte: u8,
     bg_high_byte: u8,
     scanline: u16,
-    scanline_cycle: u16,
+    dot: u16,
     bg_shift_register_high: u16,
     bg_shift_register_low: u16,
     at_shift_register_high: u8,
@@ -36,9 +36,9 @@ struct ScanlineState {
 
 impl ScanlineState {
     fn next_cycle(&mut self) {
-        self.scanline_cycle += 1;
-        if self.scanline_cycle == 341 {
-            self.scanline_cycle = 0;
+        self.dot += 1;
+        if self.dot == 341 {
+            self.dot = 0;
             self.scanline += 1;
             if self.scanline == 262 {
                 self.scanline = 0;
@@ -177,14 +177,14 @@ pub(crate) struct Ppu {
 impl Ppu {
     pub(super) fn new(chr_address_bus: Box<dyn PpuCartridgeAddressBus>) -> Self {
         Ppu {
-            total_cycles: 0,
+            total_cycles: 27,
             scanline_state: ScanlineState {
                 scanline: 0,
                 nametable_byte: 0,
                 attribute_table_byte: 0,
                 bg_high_byte: 0,
                 bg_low_byte: 0,
-                scanline_cycle: 27, // Skip the startup sequence but correctly set the PPU cycles consumed during it
+                dot: 27, // Skip the startup sequence but correctly set the PPU cycles consumed during it
                 bg_shift_register_high: 0,
                 bg_shift_register_low: 0,
                 at_shift_register_high: 0,
@@ -249,13 +249,13 @@ impl Ppu {
     }
 
     pub(crate) fn current_scanline_cycle(&self) -> u16 {
-        self.scanline_state.scanline_cycle
+        self.scanline_state.dot
     }
 
     /// Return whether or not we're in the cycle immediately after rendering
     /// visible lines is complete
     pub(crate) fn output_cycle(&self) -> bool {
-        self.scanline_state.scanline == 240 && self.scanline_state.scanline_cycle == 0
+        self.scanline_state.scanline == 240 && self.scanline_state.dot == 0
     }
 
     /// Writes to the various PPU registers mapped into the CPU address space.
@@ -271,7 +271,7 @@ impl Ppu {
                 // PPUCTRL - Setting NMI enable during vblank from low to high will immediately cause an NMI
                 if !self.ppu_ctrl.nmi_enable && value & 0b1000_0000 != 0 && self.ppu_status.vblank_started {
                     // Doesn't affect if vblank about to be turned off
-                    if self.scanline_state.scanline != 261 || self.scanline_state.scanline_cycle != 1 {
+                    if self.scanline_state.scanline != 261 || self.scanline_state.dot != 1 {
                         self.nmi_interrupt = Some(Interrupt::NMI(self.total_cycles));
                         info!("Triggering NMI");
                     }
@@ -346,12 +346,18 @@ impl Ppu {
         match address {
             0x2000 => self.last_written_byte,
             0x2001 => self.last_written_byte,
+            // PPUSTATUS
             0x2002 => {
+                info!(
+                    "PPUSTATUS read on scanline {}, dot {}",
+                    self.scanline_state.scanline, self.scanline_state.dot
+                );
                 // Suppress NMI if it was triggered within the last 2 PPU cycles
                 match self.nmi_interrupt {
                     None => (),
                     Some(Interrupt::NMI(cycles)) => {
                         if cycles >= self.total_cycles - 2 {
+                            info!("Suppressing NMI due to proximity to PPUSTATUS read");
                             self.nmi_interrupt = None;
                         }
                     }
@@ -364,7 +370,7 @@ impl Ppu {
             0x2003 => self.last_written_byte,
             0x2004 => self
                 .sprite_data
-                .read_oam_data(self.scanline_state.scanline_cycle, self.ppu_mask.is_rendering_enabled()),
+                .read_oam_data(self.scanline_state.dot, self.ppu_mask.is_rendering_enabled()),
             0x2005 => self.last_written_byte,
             0x2006 => self.last_written_byte,
             0x2007 => {
@@ -603,55 +609,52 @@ impl Iterator for Ppu {
     fn next(&mut self) -> Option<Self::Item> {
         let mut trigger_cycle_skip = false;
 
-        if self.scanline_state.scanline == 0 && self.scanline_state.scanline_cycle == 0 {
+        if self.scanline_state.scanline == 0 && self.scanline_state.dot == 0 {
             self.is_short_frame = !self.is_short_frame;
         }
 
         match self.scanline_state.scanline {
             0..=239 | 261 => {
-                if self.scanline_state.scanline != 261
-                    && self.scanline_state.scanline_cycle >= 1
-                    && self.scanline_state.scanline_cycle <= 256
+                if self.scanline_state.scanline != 261 && self.scanline_state.dot >= 1 && self.scanline_state.dot <= 256
                 {
-                    self.draw_pixel(self.scanline_state.scanline, self.scanline_state.scanline_cycle);
+                    self.draw_pixel(self.scanline_state.scanline, self.scanline_state.dot);
                 }
 
                 if self.ppu_mask.is_rendering_enabled() {
-                    self.fetch_data(self.scanline_state.scanline_cycle);
+                    self.fetch_data(self.scanline_state.dot);
 
                     self.process_sprite_cycle(
                         self.scanline_state.scanline,
-                        self.scanline_state.scanline_cycle,
+                        self.scanline_state.dot,
                         self.ppu_ctrl.sprite_size.pixels(),
                         self.ppu_ctrl.sprite_tile_table_select,
                     );
 
                     // Background registers shift on dots 2-256 322-337 inclusive EXCEPT on pre-render where they only shift during 322-337
-                    if (self.scanline_state.scanline_cycle >= 2
-                        && self.scanline_state.scanline_cycle <= 256
+                    if (self.scanline_state.dot >= 2
+                        && self.scanline_state.dot <= 256
                         && self.scanline_state.scanline != 261)
-                        || (self.scanline_state.scanline_cycle >= 322 && self.scanline_state.scanline_cycle <= 337)
+                        || (self.scanline_state.dot >= 322 && self.scanline_state.dot <= 337)
                     {
                         self.scanline_state.shift_bg_registers();
                     }
 
-                    if self.scanline_state.scanline == 261
-                        && self.scanline_state.scanline_cycle == 339
-                        && self.is_short_frame
-                    {
+                    if self.scanline_state.scanline == 261 && self.scanline_state.dot == 339 && self.is_short_frame {
                         trigger_cycle_skip = true;
                     }
                 }
 
                 if self.scanline_state.scanline == 261 {
-                    self.handle_prerender_scanline_cycle(self.scanline_state.scanline_cycle);
+                    self.handle_prerender_scanline_cycle(self.scanline_state.dot);
                 }
             }
             240..=260 => {
                 // PPU in idle state during scanline 240 and during VBlank except for triggering NMI
-                if self.scanline_state.scanline_cycle == 1 && self.scanline_state.scanline == 241 {
+                if self.scanline_state.dot == 1 && self.scanline_state.scanline == 241 {
+                    info!("Vblank set cycle {}", self.total_cycles);
                     if self.last_ppu_status_read_cycle != self.total_cycles {
                         self.ppu_status.vblank_started = true;
+
                         // Trigger a NMI as both vblank flag and nmi enabled are pulled up
                         if self.ppu_ctrl.nmi_enable {
                             self.nmi_interrupt = Some(Interrupt::NMI(self.total_cycles));

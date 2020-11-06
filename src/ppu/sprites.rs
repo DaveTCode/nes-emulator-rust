@@ -263,7 +263,7 @@ impl super::Ppu {
                                 "Setting sprite overflow flag to true at oam_addr {}, scanline {}, dot {}, cycle {}",
                                 self.sprite_data.oam_addr - 1,
                                 self.scanline_state.scanline,
-                                self.scanline_state.scanline_cycle,
+                                self.scanline_state.dot,
                                 self.total_cycles
                             );
                         }

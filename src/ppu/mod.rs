@@ -557,7 +557,16 @@ impl Ppu {
                     _ => self.get_sprite_pixel(x),
                 };
 
-            if is_sprite_zero && (sprite_pixel & 0b11) != 0 && (bg_pixel & 0b11) != 0 && x != 0xFF {
+            if is_sprite_zero
+                && (sprite_pixel & 0b11) != 0
+                && (bg_pixel & 0b11) != 0
+                && x != 0xFF
+                && !self.ppu_status.sprite_zero_hit
+            {
+                info!(
+                    "Sprite zero hit on cycle {} scanline {} dot {} bg_pixel {:02X} sprite_pixel {:02X}",
+                    self.total_cycles, self.scanline_state.scanline, self.scanline_state.dot, bg_pixel, sprite_pixel
+                );
                 self.ppu_status.sprite_zero_hit = true;
             }
 

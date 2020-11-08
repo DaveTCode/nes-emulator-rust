@@ -1035,8 +1035,8 @@ impl<'a> Cpu<'a> {
             DmaState::WriteCycle(value) => {
                 self.ppu.write_dma_byte(value, (self.dma_address - 1) as u8);
 
-                if self.dma_address & 0x100 == 0x100 {
-                    error!("Finished DMA on cycle {}", self.cycles);
+                if self.dma_address.trailing_zeros() >= 8 {
+                    info!("Finished DMA on cycle {}", self.cycles);
                     State::Cpu(CpuState::FetchOpcode)
                 } else {
                     State::Dma(DmaState::ReadCycle)

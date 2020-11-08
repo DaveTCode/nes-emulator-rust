@@ -87,6 +87,9 @@ pub(super) struct SpriteData {
     secondary_oam_ram_pointer: usize,
     eval_state: SpriteEvaluation,
     fetch_state: SpriteFetch,
+    /// We need to know whether sprite zero is loaded into secondary OAM RAM to
+    /// know whether a sprite at output unit 0 triggers a sprite zero hit
+    sprite_zero_visible: bool,
 }
 
 impl SpriteData {
@@ -111,10 +114,12 @@ impl SpriteData {
             secondary_oam_ram_pointer: 0,
             eval_state: SpriteEvaluation::ReadY,
             fetch_state: SpriteFetch::ReadY { sprite_index: 0 },
+            sprite_zero_visible: false,
         }
     }
 
     pub(super) fn clear_sprites(&mut self) {
+        self.sprite_zero_visible = false;
         for sprite in &mut self.sprites {
             sprite.visible = false;
         }
@@ -182,7 +187,7 @@ impl super::Ppu {
                     result = (
                         0b10000 | (palette_number << 2) | color_val,
                         self.sprite_data.sprites[sprite_index].attribute_latch.priority,
-                        sprite_index == 0,
+                        sprite_index == 0 && self.sprite_data.sprite_zero_visible,
                     );
 
                     found_pixel = true;
@@ -250,6 +255,11 @@ impl super::Ppu {
                 }
 
                 if scanline >= y as u16 && scanline < y as u16 + sprite_height as u16 {
+                    // Track sprite zero being visible on this line
+                    if self.sprite_data.oam_addr == 0 {
+                        self.sprite_data.sprite_zero_visible = true;
+                    }
+
                     // Start moving this sprite into OAMRAM
                     self.sprite_data.secondary_oam_ram_pointer += 1;
 

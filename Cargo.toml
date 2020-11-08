@@ -15,6 +15,13 @@ log = "0.4.11"
 log4rs = "1.0.0-alpha-2"
 zip = "0.5.8"
 
+[dev-dependencies]
+criterion = "0.3.3"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+
 [profile.release]
 opt-level = 3
 debug = 2

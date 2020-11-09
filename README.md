@@ -10,6 +10,7 @@ used to play games or to debug other emulators and has no features beyond "run t
     <td><img src="./.github/images/ninja_gaiden.png" width="200" height="200"></td>
     <td><img src="./.github/images/super-mario-bros.png" width="200" height="200"></td>
     <td><img src="./.github/images/zelda.png" width="200" height="200"></td>
+    <td><img src="./.github/images/battletoads.png" width="200" height="200"></td>
   </tr>
  </table>
 

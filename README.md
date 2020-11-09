@@ -5,9 +5,13 @@
 This project is a learning project to attempt writing a cycle accurate NES emulator in rust. It is not intended to be
 used to play games or to debug other emulators and has no features beyond "run this rom".
 
-![Ninja Gaiden](./.github/images/ninja_gaiden.png)
-![Super Mario Bros](./.github/images/super-mario-bros.png)
-![Zelda](./.github/images/zelda.png)
+<table>
+  <tr>
+    <td><img src="./.github/images/ninja_gaiden.png" width="200" height="200"></td>
+    <td><img src="./.github/images/super-mario-bros.png" width="200" height="200"></td>
+    <td><img src="./.github/images/zelda.png" width="200" height="200"></td>
+  </tr>
+ </table>
 
 ## Key Missing Features
 

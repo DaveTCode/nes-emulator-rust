@@ -4,6 +4,7 @@ use cpu::CpuCycle;
 use log::debug;
 use ppu::PpuCycle;
 
+pub(super) mod axrom; // Mapper 7
 pub(super) mod cnrom; // Mapper 3
 pub(super) mod mmc1; // Mapper 1
 pub(super) mod mmc3; // Mapper 4
@@ -94,10 +95,16 @@ pub(crate) struct BankedChrChip {
     chr_bank: u8,
     chr_bank_offset: usize,
     mirroring_mode: MirroringMode,
+    cpu_write_byte_fn: fn(u16, u8, u8, &mut u8, &mut usize, &mut MirroringMode) -> (),
 }
 
 impl BankedChrChip {
-    pub(super) fn new(chr_rom: Option<Vec<u8>>, mirroring_mode: MirroringMode, total_chr_banks: u8) -> Self {
+    pub(super) fn new(
+        chr_rom: Option<Vec<u8>>,
+        mirroring_mode: MirroringMode,
+        total_chr_banks: u8,
+        cpu_write_byte_fn: fn(u16, u8, u8, &mut u8, &mut usize, &mut MirroringMode) -> (),
+    ) -> Self {
         match chr_rom {
             Some(rom) => BankedChrChip {
                 chr_data: ChrData::Rom(rom),
@@ -106,6 +113,7 @@ impl BankedChrChip {
                 chr_bank: 0,
                 chr_bank_offset: 0,
                 mirroring_mode,
+                cpu_write_byte_fn,
             },
             None => BankedChrChip {
                 chr_data: ChrData::Ram(Box::new([0; 0x2000])),
@@ -114,6 +122,7 @@ impl BankedChrChip {
                 chr_bank: 0,
                 chr_bank_offset: 0,
                 mirroring_mode,
+                cpu_write_byte_fn,
             },
         }
     }
@@ -166,9 +175,13 @@ impl PpuCartridgeAddressBus for BankedChrChip {
             address, value, cycles
         );
 
-        if let 0x8000..=0xFFFF = address {
-            self.chr_bank = value % self.total_chr_banks;
-            self.chr_bank_offset = self.chr_bank as usize * 0x2000;
-        }
+        (self.cpu_write_byte_fn)(
+            address,
+            value,
+            self.total_chr_banks,
+            &mut self.chr_bank,
+            &mut self.chr_bank_offset,
+            &mut self.mirroring_mode,
+        );
     }
 }

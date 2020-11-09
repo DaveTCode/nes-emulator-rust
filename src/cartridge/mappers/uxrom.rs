@@ -1,4 +1,5 @@
 use cartridge::mappers::{BankedChrChip, BankedPrgChip};
+use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
@@ -16,6 +17,20 @@ fn uxrom_update_prg_banks(
         bank_offsets[0] = banks[0] as usize * 0x4000;
         info!("Bank switch {:?} -> {:?}", banks, bank_offsets);
     }
+}
+
+fn uxrom_chr_cpu_write_fn(
+    address: u16,
+    value: u8,
+    total_banks: u8,
+    bank: &mut u8,
+    bank_offset: &mut usize,
+    _: &mut MirroringMode,
+) {
+    if let 0x8000..=0xFFFF = address {
+        *bank = value % total_banks;
+        *bank_offset = *bank as usize * 0x2000;
+    };
 }
 
 pub(crate) fn from_header(
@@ -37,7 +52,7 @@ pub(crate) fn from_header(
             [0, (header.prg_rom_16kb_units as usize - 1) * 0x4000],
             uxrom_update_prg_banks,
         )),
-        Box::new(BankedChrChip::new(chr_rom, header.mirroring, 1)),
+        Box::new(BankedChrChip::new(chr_rom, header.mirroring, 1, uxrom_chr_cpu_write_fn)),
         header,
     )
 }

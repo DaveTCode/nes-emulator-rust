@@ -180,6 +180,7 @@ pub(crate) fn from_file(
         2 | 94 => Ok(mappers::uxrom::from_header(prg_rom, chr_rom, header)),
         3 => Ok(mappers::cnrom::from_header(prg_rom, chr_rom, header)),
         4 => Ok(mappers::mmc3::from_header(prg_rom, chr_rom, header)),
+        7 => Ok(mappers::axrom::from_header(prg_rom, chr_rom, header)),
         _ => Err(CartridgeError {
             message: format!("Mapper {:02X} not yet implemented", header.mapper),
         }),

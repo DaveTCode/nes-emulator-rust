@@ -106,6 +106,8 @@ rom_tests! {
      // TODO - Unconvinced, this claims 8KB CR but surely based on name it's 32KB, maybe I don't support higher than 8KB RAM on an MMC3 board?
     mapper_4_p128k_cr32k: (0x28DBF4 * 3 as usize, 1769737631, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR32K.nes")),
     mapper_4_p256k_c256k: (0xC3B1E * 3 as usize, 502837231, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")),
+    mapper_7_p128k: (0x262201 * 3 as usize, 2603256516, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M7_P128K.nes")),
+    mapper_7_p128k_cr8k: (0x262201 * 3 as usize, 423779697, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M7_P128K_CR8K.nes")),
 
     // ----- MMC3 IRQ Tests -----
     mmc3_irq_clocking: (0x105218 * 3 as usize, 4185058565, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("1-clocking.nes")),

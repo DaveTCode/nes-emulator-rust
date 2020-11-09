@@ -4,7 +4,7 @@ use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
 use log::info;
 
-fn cnrom_update_banks(_: u16, _: u8, _: u8, _: &mut [u8; 2], _: &mut [usize; 2]) {}
+fn cnrom_update_prg_banks(_: u16, _: u8, _: u8, _: &mut [u8; 2], _: &mut [usize; 2]) {}
 
 pub(crate) fn from_header(
     prg_rom: Vec<u8>,
@@ -23,7 +23,7 @@ pub(crate) fn from_header(
             header.prg_rom_16kb_units,
             [0, 1],
             [0, 0x4000],
-            cnrom_update_banks,
+            cnrom_update_prg_banks,
         )),
         Box::new(BankedChrChip::new(chr_rom, header.mirroring, header.chr_rom_8kb_units)),
         header,

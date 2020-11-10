@@ -4,7 +4,7 @@ use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
 use cpu::CpuCycle;
-use log::{debug, error, info};
+use log::{debug, info};
 use ppu::PpuCycle;
 
 #[derive(Debug, PartialEq)]

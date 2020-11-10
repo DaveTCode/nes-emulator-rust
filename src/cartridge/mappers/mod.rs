@@ -7,6 +7,7 @@ use ppu::PpuCycle;
 pub(super) mod axrom; // Mapper 7
 pub(super) mod cnrom; // Mapper 3
 pub(super) mod mmc1; // Mapper 1
+pub(super) mod mmc2; // Mapper 9
 pub(super) mod mmc3; // Mapper 4
 pub(super) mod nrom; // Mapper 0
 pub(super) mod uxrom; // Mapper 2, 94, 180
@@ -20,9 +21,9 @@ pub(super) struct BankedPrgChip {
     prg_rom: Vec<u8>,
     prg_ram: Option<[u8; 0x2000]>,
     total_banks: u8,
-    prg_rom_banks: [u8; 2],
-    prg_rom_bank_offsets: [usize; 2],
-    write_byte_function: fn(u16, u8, u8, &mut [u8; 2], &mut [usize; 2]) -> (),
+    prg_rom_banks: [u8; 4],
+    prg_rom_bank_offsets: [usize; 4],
+    write_byte_function: fn(u16, u8, u8, &mut [u8; 4], &mut [usize; 4]) -> (),
 }
 
 impl BankedPrgChip {
@@ -30,9 +31,9 @@ impl BankedPrgChip {
         prg_rom: Vec<u8>,
         prg_ram: Option<[u8; 0x2000]>,
         total_banks: u8,
-        prg_rom_banks: [u8; 2],
-        prg_rom_bank_offsets: [usize; 2],
-        write_byte_function: fn(u16, u8, u8, &mut [u8; 2], &mut [usize; 2]) -> (),
+        prg_rom_banks: [u8; 4],
+        prg_rom_bank_offsets: [usize; 4],
+        write_byte_function: fn(u16, u8, u8, &mut [u8; 4], &mut [usize; 4]) -> (),
     ) -> Self {
         let full_prg_rom = match prg_rom.len() {
             0x4000 => {
@@ -62,8 +63,10 @@ impl CpuCartridgeAddressBus for BankedPrgChip {
                 None => 0x0,
                 Some(ram) => ram[(address - 0x6000) as usize],
             },
-            0x8000..=0xBFFF => self.prg_rom[self.prg_rom_bank_offsets[0] + (address as usize - 0x8000)],
-            0xC000..=0xFFFF => self.prg_rom[self.prg_rom_bank_offsets[1] + (address as usize - 0xC000)],
+            0x8000..=0x9FFF => self.prg_rom[self.prg_rom_bank_offsets[0] + (address as usize - 0x8000)],
+            0xA000..=0xBFFF => self.prg_rom[self.prg_rom_bank_offsets[1] + (address as usize - 0xA000)],
+            0xC000..=0xDFFF => self.prg_rom[self.prg_rom_bank_offsets[2] + (address as usize - 0xC000)],
+            0xE000..=0xFFFF => self.prg_rom[self.prg_rom_bank_offsets[3] + (address as usize - 0xE000)],
             _ => 0x0, // TODO - Not 100% sure on this, but mapper tests do check it.
         }
     }

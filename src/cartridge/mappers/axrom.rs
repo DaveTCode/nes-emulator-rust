@@ -10,14 +10,15 @@ fn axrom_update_prg_banks(
     address: u16,
     value: u8,
     total_banks: u8,
-    banks: &mut [u8; 2],
-    bank_offsets: &mut [usize; 2],
+    banks: &mut [u8; 4],
+    bank_offsets: &mut [usize; 4],
 ) {
     if let 0x8000..=0xFFFF = address {
         banks[0] = (value & 0b111) % total_banks;
-        banks[1] = banks[0] + 1;
         bank_offsets[0] = banks[0] as usize * 0x8000;
-        bank_offsets[1] = bank_offsets[0] + 0x4000;
+        bank_offsets[1] = bank_offsets[0] + 0x2000;
+        bank_offsets[2] = bank_offsets[1] + 0x2000;
+        bank_offsets[3] = bank_offsets[2] + 0x2000;
         info!("AxROM PRG Bank switch {:?} -> {:?}", banks, bank_offsets);
     }
 }
@@ -56,8 +57,8 @@ pub(crate) fn from_header(
             prg_rom,
             None,
             header.prg_rom_16kb_units / 2,
-            [0, 1],
-            [0, 0x4000],
+            [0, 1, 2, 3],
+            [0, 0x2000, 0x4000, 0x6000],
             axrom_update_prg_banks,
         )),
         Box::new(BankedChrChip::new(

@@ -5,7 +5,7 @@ use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
 use log::info;
 
-fn cnrom_update_prg_banks(_: u16, _: u8, _: u8, _: &mut [u8; 2], _: &mut [usize; 2]) {}
+fn cnrom_update_prg_banks(_: u16, _: u8, _: u8, _: &mut [u8; 4], _: &mut [usize; 4]) {}
 
 fn cnrom_chr_cpu_write_fn(
     address: u16,
@@ -36,8 +36,8 @@ pub(crate) fn from_header(
             prg_rom,
             None,
             header.prg_rom_16kb_units,
-            [0, 1],
-            [0, 0x4000],
+            [0, 1, 2, 3],
+            [0, 0x2000, 0x4000, 0x6000],
             cnrom_update_prg_banks,
         )),
         Box::new(BankedChrChip::new(

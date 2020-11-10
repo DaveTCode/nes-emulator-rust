@@ -11,6 +11,7 @@ used to play games or to debug other emulators and has no features beyond "run t
     <td><img src="./.github/images/super-mario-bros.png" width="200" height="200"></td>
     <td><img src="./.github/images/zelda.png" width="200" height="200"></td>
     <td><img src="./.github/images/battletoads.png" width="200" height="200"></td>
+    <td><img src="./.github/images/punch-out.png" width="200" height="200"></td>
   </tr>
  </table>
 
@@ -18,7 +19,7 @@ used to play games or to debug other emulators and has no features beyond "run t
 
 - APU is only partially complete (no DMC) and does not yet output audio (no mixer and no provision for sending 
 the samples anywhere)
-- Only mappers 1-4 are complete although that covers a large percentage of the rom space
+- Only a few key mappers supported (0, 1, 2, 3, 4, 7, 9)
 - No support for peripherals beyond a standard NES controller
 - Support only provided for NTSC device
 

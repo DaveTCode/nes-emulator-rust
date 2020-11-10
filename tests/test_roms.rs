@@ -108,6 +108,7 @@ rom_tests! {
     mapper_4_p256k_c256k: (0xC3B1E * 3 as usize, 502837231, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")),
     mapper_7_p128k: (0x262201 * 3 as usize, 2603256516, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M7_P128K.nes")),
     mapper_7_p128k_cr8k: (0x262201 * 3 as usize, 423779697, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M7_P128K_CR8K.nes")),
+    mapper_9_p128k_c64k: (0x4F5DD * 3 as usize, 3084268463, Path::new(".").join("roms").join("test").join("holy_mapperel").join("M9_P128K_C64K.nes")),
 
     // ----- MMC3 IRQ Tests -----
     mmc3_irq_clocking: (0x105218 * 3 as usize, 4185058565, Path::new(".").join("roms").join("test").join("mmc3_test").join("rom_singles").join("1-clocking.nes")),

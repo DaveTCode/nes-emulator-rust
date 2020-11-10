@@ -1,4 +1,4 @@
-use log::error;
+use log::info;
 
 #[rustfmt::skip]
 pub(super) const PALETTE_2C02: [u32; 0x40] = [
@@ -31,6 +31,8 @@ impl PaletteRam {
 
     pub(super) fn write_byte(&mut self, address: u16, value: u8) {
         debug_assert!(address >= 0x3F00 && address <= 0x3FFF);
+        let value = value & 0x3F;
+        info!("Setting palette value {:04X}={:02X}", address, value);
 
         let index = address as usize & 0x1F;
         let mirror = PALETTE_MIRRORS[index];

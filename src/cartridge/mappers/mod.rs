@@ -1,9 +1,11 @@
 use cartridge::mirroring::MirroringMode;
-use log::debug;
+use cartridge::{CpuCartridgeAddressBus, PpuCartridgeAddressBus};
+use log::{debug, info};
 
 pub(super) mod axrom; // Mapper 7
 pub(super) mod cnrom; // Mapper 3
 pub(super) mod color_dreams; // Mapper 11
+pub(super) mod gxrom; // Mapper 66
 pub(super) mod mmc1; // Mapper 1
 pub(super) mod mmc2; // Mapper 9
 pub(super) mod mmc3; // Mapper 4
@@ -180,6 +182,94 @@ impl PrgBaseData {
                 None => (),
                 Some(mut ram) => ram[(address - 0x6000) as usize] = value,
             }
+        }
+    }
+}
+
+pub(crate) struct NoBankPrgChip {
+    base: PrgBaseData,
+}
+
+impl NoBankPrgChip {
+    pub(super) fn new(prg_rom: Vec<u8>) -> Self {
+        NoBankPrgChip {
+            base: PrgBaseData::new(prg_rom, Some([0; 0x2000]), 1, 0x8000, vec![0], vec![0]),
+        }
+    }
+}
+
+impl CpuCartridgeAddressBus for NoBankPrgChip {
+    fn read_byte(&self, address: u16) -> u8 {
+        self.base.read_byte(address)
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        self.base.write_byte(address, value)
+    }
+}
+
+/// NRom is a chip with no CHR banking and fixed soldered mirroring mode from the cartridge itself
+pub(crate) struct NoBankChrChip {
+    base: ChrBaseData,
+}
+
+impl NoBankChrChip {
+    pub(super) fn new(chr_data: ChrData, mirroring_mode: MirroringMode) -> Self {
+        NoBankChrChip {
+            base: ChrBaseData::new(mirroring_mode, chr_data, 0x2000, vec![0], vec![0]),
+        }
+    }
+}
+
+impl PpuCartridgeAddressBus for NoBankChrChip {
+    fn check_trigger_irq(&mut self, _: bool) -> bool {
+        false
+    }
+
+    fn update_vram_address(&mut self, _: u16, _: u32) {}
+
+    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
+        self.base.read_byte(address)
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        self.base.write_byte(address, value);
+    }
+
+    fn cpu_write_byte(&mut self, _: u16, _: u8, _: u32) {}
+}
+
+/// Used to represent all mappers which just use a single register write to map a single 32KB bank
+struct SingleBankedPrgChip {
+    base: PrgBaseData,
+    /// Mask applied to the value written to the register before turning into the bank (applied after mask)
+    mask: u8,
+    /// Right Shift applied to the value written to the register before turning into the bank (applied after mask)
+    shift: u8,
+}
+
+impl SingleBankedPrgChip {
+    fn new(prg_rom: Vec<u8>, total_banks: usize, mask: u8, shift: u8) -> Self {
+        SingleBankedPrgChip {
+            base: PrgBaseData::new(prg_rom, None, total_banks, 0x8000, vec![0], vec![0]),
+            mask,
+            shift,
+        }
+    }
+}
+
+impl CpuCartridgeAddressBus for SingleBankedPrgChip {
+    fn read_byte(&self, address: u16) -> u8 {
+        self.base.read_byte(address)
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        self.base.write_byte(address, value);
+
+        if let 0x8000..=0xFFFF = address {
+            self.base.banks[0] = ((value & self.mask) >> self.shift) as usize % self.base.total_banks;
+            self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x8000;
+            info!("PRG Bank switch {:?} -> {:?}", self.base.banks, self.base.bank_offsets);
         }
     }
 }

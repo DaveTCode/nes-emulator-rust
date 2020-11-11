@@ -1,41 +1,9 @@
-use cartridge::mappers::{ChrBaseData, ChrData, PrgBaseData};
+use cartridge::mappers::{ChrBaseData, ChrData, SingleBankedPrgChip};
 use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
 use log::info;
-
-struct AxRomPrgChip {
-    base: PrgBaseData,
-}
-
-impl AxRomPrgChip {
-    fn new(prg_rom: Vec<u8>, total_banks: usize) -> Self {
-        AxRomPrgChip {
-            base: PrgBaseData::new(prg_rom, None, total_banks, 0x8000, vec![0], vec![0]),
-        }
-    }
-}
-
-impl CpuCartridgeAddressBus for AxRomPrgChip {
-    fn read_byte(&self, address: u16) -> u8 {
-        self.base.read_byte(address)
-    }
-
-    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
-        self.base.write_byte(address, value);
-
-        // AxROM has a single 32KB switchable bank driven by PRG 0-2
-        if let 0x8000..=0xFFFF = address {
-            self.base.banks[0] = (value as usize & 0b111) % self.base.total_banks;
-            self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x8000;
-            info!(
-                "AxROM PRG Bank switch {:?} -> {:?}",
-                self.base.banks, self.base.bank_offsets
-            );
-        }
-    }
-}
 
 /// AxROM doesn't bank it's CHRROM/RAM but it is possible to switch mirroring
 /// mode through PRG 4
@@ -88,7 +56,12 @@ pub(crate) fn from_header(
 ) {
     info!("Creating AxROM mapper for cartridge {:?}", header);
     (
-        Box::new(AxRomPrgChip::new(prg_rom, header.prg_rom_16kb_units as usize / 2)),
+        Box::new(SingleBankedPrgChip::new(
+            prg_rom,
+            header.prg_rom_16kb_units as usize / 2,
+            0b111,
+            0,
+        )),
         Box::new(AxRomChrChip::new(
             ChrData::from(chr_rom),
             MirroringMode::OneScreenLowerBank,

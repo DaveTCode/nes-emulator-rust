@@ -1,5 +1,4 @@
-use cartridge::mappers::nrom::NoBankChrChip;
-use cartridge::mappers::{ChrData, PrgBaseData};
+use cartridge::mappers::{ChrData, NoBankChrChip, PrgBaseData};
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;

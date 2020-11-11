@@ -14,19 +14,19 @@ pub(crate) fn from_header(
     Box<dyn PpuCartridgeAddressBus>,
     CartridgeHeader,
 ) {
-    info!("Creating ColorDreams mapper for cartridge {:?}", header);
+    info!("Creating GxROM mapper for cartridge {:?}", header);
     (
         Box::new(SingleBankedPrgChip::new(
             prg_rom,
             header.prg_rom_16kb_units as usize / 2,
-            0b11,
-            0,
+            0b11_0000,
+            4,
         )),
         Box::new(SingleBankedChrChip::new(
             ChrData::from(chr_rom),
             header.mirroring,
-            0b1111_0000,
-            4,
+            0b11,
+            0,
         )),
         header,
     )

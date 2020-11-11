@@ -1,5 +1,4 @@
-use cartridge::mappers::nrom::NoBankPrgChip;
-use cartridge::mappers::{ChrBaseData, ChrData};
+use cartridge::mappers::{ChrBaseData, ChrData, NoBankPrgChip};
 use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
@@ -10,12 +9,18 @@ use log::info;
 /// Used in at least Cnrom & Uxrom variants
 pub(super) struct SingleBankedChrChip {
     base: ChrBaseData,
+    /// Mask applied to the value in the register to determine bank (applied before shift)
+    mask: u8,
+    /// Shift applied to the value in the register to determine bank (applied after mask)
+    shift: u8,
 }
 
 impl SingleBankedChrChip {
-    pub(super) fn new(chr_data: ChrData, mirroring_mode: MirroringMode) -> Self {
+    pub(super) fn new(chr_data: ChrData, mirroring_mode: MirroringMode, mask: u8, shift: u8) -> Self {
         SingleBankedChrChip {
             base: ChrBaseData::new(mirroring_mode, chr_data, 0x2000, vec![0], vec![0]),
+            mask,
+            shift,
         }
     }
 }
@@ -37,7 +42,7 @@ impl PpuCartridgeAddressBus for SingleBankedChrChip {
 
     fn cpu_write_byte(&mut self, address: u16, value: u8, _: u32) {
         if let 0x8000..=0xFFFF = address {
-            self.base.banks[0] = value as usize % self.base.total_banks;
+            self.base.banks[0] = ((value & self.mask) >> self.shift) as usize % self.base.total_banks;
             self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x2000;
         }
     }
@@ -55,7 +60,12 @@ pub(crate) fn from_header(
     info!("Creating CNROM mapper for cartridge {:?}", header);
     (
         Box::new(NoBankPrgChip::new(prg_rom)),
-        Box::new(SingleBankedChrChip::new(ChrData::from(chr_rom), header.mirroring)),
+        Box::new(SingleBankedChrChip::new(
+            ChrData::from(chr_rom),
+            header.mirroring,
+            0xFF,
+            0,
+        )),
         header,
     )
 }

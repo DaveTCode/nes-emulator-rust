@@ -8,7 +8,7 @@ use log::info;
 
 /// Straightforward CHR banked chip with one bank switched on 0x8000..0xFFFF
 /// Used in at least Cnrom & Uxrom variants
-pub(crate) struct SingleBankedChrChip {
+pub(super) struct SingleBankedChrChip {
     base: ChrBaseData,
 }
 

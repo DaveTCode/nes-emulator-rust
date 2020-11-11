@@ -3,6 +3,7 @@ use log::debug;
 
 pub(super) mod axrom; // Mapper 7
 pub(super) mod cnrom; // Mapper 3
+pub(super) mod color_dreams; // Mapper 11
 pub(super) mod mmc1; // Mapper 1
 pub(super) mod mmc2; // Mapper 9
 pub(super) mod mmc3; // Mapper 4

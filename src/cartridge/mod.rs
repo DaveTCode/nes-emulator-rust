@@ -176,12 +176,13 @@ pub(crate) fn from_file(
 
     match header.mapper {
         0 => Ok(mappers::nrom::from_header(prg_rom, chr_rom, header)),
-        1 => Ok(mappers::mmc1::from_header(prg_rom, chr_rom, header)),
-        2 | 94 => Ok(mappers::uxrom::from_header(prg_rom, chr_rom, header)),
+        1 | 155 => Ok(mappers::mmc1::from_header(prg_rom, chr_rom, header)),
+        2 | 94 | 180 => Ok(mappers::uxrom::from_header(prg_rom, chr_rom, header)),
         3 => Ok(mappers::cnrom::from_header(prg_rom, chr_rom, header)),
         4 => Ok(mappers::mmc3::from_header(prg_rom, chr_rom, header)),
         7 => Ok(mappers::axrom::from_header(prg_rom, chr_rom, header)),
         9 => Ok(mappers::mmc2::from_header(prg_rom, chr_rom, header)),
+        10 => Ok(mappers::mmc4::from_header(prg_rom, chr_rom, header)),
         _ => Err(CartridgeError {
             message: format!("Mapper {:02X} not yet implemented", header.mapper),
         }),

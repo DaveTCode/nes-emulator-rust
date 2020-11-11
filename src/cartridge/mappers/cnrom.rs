@@ -1,23 +1,45 @@
-use cartridge::mappers::{BankedChrChip, BankedPrgChip};
+use cartridge::mappers::nrom::NoBankPrgChip;
+use cartridge::mappers::{ChrBaseData, ChrData};
 use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
 use log::info;
 
-fn cnrom_update_prg_banks(_: u16, _: u8, _: u8, _: &mut [u8; 4], _: &mut [usize; 4]) {}
+/// Straightforward CHR banked chip with one bank switched on 0x8000..0xFFFF
+/// Used in at least Cnrom & Uxrom variants
+pub(crate) struct SingleBankedChrChip {
+    base: ChrBaseData,
+}
 
-fn cnrom_chr_cpu_write_fn(
-    address: u16,
-    value: u8,
-    total_banks: u8,
-    bank: &mut u8,
-    bank_offset: &mut usize,
-    _: &mut MirroringMode,
-) {
-    if let 0x8000..=0xFFFF = address {
-        *bank = value % total_banks;
-        *bank_offset = *bank as usize * 0x2000;
+impl SingleBankedChrChip {
+    pub(super) fn new(chr_data: ChrData, mirroring_mode: MirroringMode) -> Self {
+        SingleBankedChrChip {
+            base: ChrBaseData::new(mirroring_mode, chr_data, 0x2000, vec![0], vec![0]),
+        }
+    }
+}
+
+impl PpuCartridgeAddressBus for SingleBankedChrChip {
+    fn check_trigger_irq(&mut self, _: bool) -> bool {
+        false
+    }
+
+    fn update_vram_address(&mut self, _: u16, _: u32) {}
+
+    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
+        self.base.read_byte(address)
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        self.base.write_byte(address, value);
+    }
+
+    fn cpu_write_byte(&mut self, address: u16, value: u8, _: u32) {
+        if let 0x8000..=0xFFFF = address {
+            self.base.banks[0] = value as usize % self.base.total_banks;
+            self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x2000;
+        }
     }
 }
 
@@ -32,20 +54,8 @@ pub(crate) fn from_header(
 ) {
     info!("Creating CNROM mapper for cartridge {:?}", header);
     (
-        Box::new(BankedPrgChip::new(
-            prg_rom,
-            None,
-            header.prg_rom_16kb_units,
-            [0, 1, 2, 3],
-            [0, 0x2000, 0x4000, 0x6000],
-            cnrom_update_prg_banks,
-        )),
-        Box::new(BankedChrChip::new(
-            chr_rom,
-            header.mirroring,
-            header.chr_rom_8kb_units,
-            cnrom_chr_cpu_write_fn,
-        )),
+        Box::new(NoBankPrgChip::new(prg_rom)),
+        Box::new(SingleBankedChrChip::new(ChrData::from(chr_rom), header.mirroring)),
         header,
     )
 }

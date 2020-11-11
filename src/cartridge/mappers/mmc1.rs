@@ -1,4 +1,4 @@
-use cartridge::mappers::ChrData;
+use cartridge::mappers::{ChrBaseData, ChrData, PrgBaseData};
 use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
@@ -14,10 +14,17 @@ enum PRGBankMode {
     FixLast16KB,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum CHRBankMode {
     Switch8KB,
     Switch4KB,
+}
+
+#[derive(Debug, PartialEq)]
+enum MMC1Variant {
+    MMC1,
+    /// MMC1A allocated to mapper 155 is identical to MMC1 except that RAM is _always_ enabled
+    MMC1A,
 }
 
 struct LoadRegister {
@@ -37,29 +44,30 @@ impl LoadRegister {
 }
 
 pub(crate) struct MMC1PrgChip {
-    prg_rom: Vec<u8>,
-    prg_banks: u8,
-    prg_ram: [u8; 0x2000],
+    base: PrgBaseData,
     prg_ram_enabled: bool,
     prg_bank_mode: PRGBankMode,
-    prg_bank: u8,
-    prg_bank_offsets: [u32; 2],
     load_register: LoadRegister,
+    variant: MMC1Variant,
 }
 
 impl MMC1PrgChip {
-    fn new(prg_rom: Vec<u8>, prg_banks: u8) -> Self {
+    fn new(prg_rom: Vec<u8>, total_banks: usize, variant: MMC1Variant) -> Self {
         debug_assert!(prg_rom.len() >= 0x4000);
 
         let mut chip = MMC1PrgChip {
-            prg_rom,
-            prg_banks,
-            prg_ram: [0; 0x2000],
+            base: PrgBaseData::new(
+                prg_rom,
+                Some([0; 0x2000]), // TODO - I think this should be optional
+                total_banks,
+                0x4000,
+                vec![0, total_banks - 1],
+                vec![0, (total_banks - 1) * 0x4000],
+            ),
             prg_ram_enabled: true,
             prg_bank_mode: PRGBankMode::FixLast16KB,
-            prg_bank: 0,
-            prg_bank_offsets: [0; 2],
             load_register: LoadRegister::new(),
+            variant,
         };
 
         chip.update_bank_offsets();
@@ -83,12 +91,12 @@ impl MMC1PrgChip {
     fn update_prg_bank(&mut self, value: u8) {
         self.prg_ram_enabled = value & 0b1_0000 == 0;
 
-        self.prg_bank = match self.prg_bank_mode {
-            PRGBankMode::Switch32KB => (value & 0b1110) >> 1,
-            _ => value & 0b1111,
-        } % self.prg_banks;
+        self.base.banks[0] = match self.prg_bank_mode {
+            PRGBankMode::Switch32KB => (value as usize & 0b1110) >> 1,
+            _ => value as usize & 0b1111,
+        } % self.base.total_banks;
 
-        info!("PRG Bank updated to {:02X}/{:02X}", self.prg_bank, self.prg_banks);
+        info!("PRG Banks updated to {:?}", self.base.banks);
 
         self.update_bank_offsets();
     }
@@ -96,45 +104,45 @@ impl MMC1PrgChip {
     fn update_bank_offsets(&mut self) {
         match self.prg_bank_mode {
             PRGBankMode::FixFirst16KB => {
-                self.prg_bank_offsets[0] = 0;
-                self.prg_bank_offsets[1] = self.prg_bank as u32 * 0x4000;
+                self.base.bank_offsets[0] = 0;
+                self.base.bank_offsets[1] = self.base.banks[0] * 0x4000;
             }
             PRGBankMode::FixLast16KB => {
-                self.prg_bank_offsets[0] = self.prg_bank as u32 * 0x4000;
-                self.prg_bank_offsets[1] = self.prg_rom.len() as u32 - 0x4000;
+                self.base.bank_offsets[0] = self.base.banks[0] * 0x4000;
+                self.base.bank_offsets[1] = self.base.prg_rom.len() as usize - 0x4000;
             }
             PRGBankMode::Switch32KB => {
-                self.prg_bank_offsets[0] = self.prg_bank as u32 * 0x8000;
-                self.prg_bank_offsets[1] = self.prg_bank_offsets[0] + 0x4000;
+                self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x8000;
+                self.base.bank_offsets[1] = self.base.bank_offsets[0] + 0x4000;
             }
         };
 
-        info!(
-            "Bank offsets updated: {:04X} {:04X}",
-            self.prg_bank_offsets[0], self.prg_bank_offsets[1]
-        );
+        info!("Bank offsets updated: {:?}", self.base.bank_offsets);
     }
 }
 
 impl CpuCartridgeAddressBus for MMC1PrgChip {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x6000..=0x7FFF => {
-                if self.prg_ram_enabled {
-                    self.prg_ram[(address - 0x6000) as usize]
-                } else {
-                    0x0
+            0x6000..=0x7FFF => match self.base.prg_ram {
+                Some(ram) => {
+                    if self.prg_ram_enabled || self.variant == MMC1Variant::MMC1A {
+                        ram[(address - 0x6000) as usize]
+                    } else {
+                        0x0
+                    }
                 }
-            }
+                None => 0x0,
+            },
             0x8000..=0xBFFF => {
                 let adj_addr = address as usize - 0x8000;
 
-                self.prg_rom[adj_addr + self.prg_bank_offsets[0] as usize]
+                self.base.prg_rom[adj_addr + self.base.bank_offsets[0] as usize]
             }
             0xC000..=0xFFFF => {
                 let adj_addr = address as usize - 0xC000;
 
-                self.prg_rom[adj_addr + self.prg_bank_offsets[1] as usize]
+                self.base.prg_rom[adj_addr + self.base.bank_offsets[1] as usize]
             }
             _ => 0x0,
         }
@@ -148,12 +156,14 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
         self.load_register.last_write_cycle = cycles;
 
         match address {
-            0x6000..=0x7FFF => {
-                if self.prg_ram_enabled {
-                    // TODO - some variants of MMC1 always have RAM enabled
-                    self.prg_ram[(address - 0x6000) as usize] = value;
+            0x6000..=0x7FFF => match &mut self.base.prg_ram {
+                Some(ram) => {
+                    if self.prg_ram_enabled || self.variant == MMC1Variant::MMC1A {
+                        ram[(address - 0x6000) as usize] = value;
+                    }
                 }
-            }
+                None => {}
+            },
             0x8000..=0xFFFF => {
                 if value & 0b1000_0000 != 0 {
                     self.load_register.value = 0;
@@ -166,8 +176,8 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
                     if self.load_register.shift_writes == 5 {
                         match address {
                             0x8000..=0x9FFF => self.update_control_register(self.load_register.value),
-                            0xA000..=0xBFFF => (), // Rust ownership...this write is handled by the CHR bus //self.update_chr_bank(self.load_register, 0),
-                            0xC000..=0xDFFF => (), // Rust ownership...this write is handled by the CHR bus self.update_chr_bank(self.load_register, 1),
+                            0xA000..=0xBFFF => (),
+                            0xC000..=0xDFFF => (),
                             0xE000..=0xFFFF => self.update_prg_bank(self.load_register.value),
                             _ => panic!("Invalid MMC1 address {:04X}={:02X}", address, value),
                         }
@@ -183,44 +193,28 @@ impl CpuCartridgeAddressBus for MMC1PrgChip {
 }
 
 pub(crate) struct MMC1ChrChip {
-    chr_data: ChrData,
-    chr_banks: u8,
-    ppu_vram: [u8; 0x1000],
-    chr_bank: [u8; 2],
-    chr_bank_offsets: [usize; 2],
+    base: ChrBaseData,
     load_register: LoadRegister,
-    mirroring_mode: MirroringMode,
     chr_bank_mode: CHRBankMode,
 }
 
 impl MMC1ChrChip {
-    fn new(chr_rom: Option<Vec<u8>>, banks: u8) -> Self {
-        match chr_rom {
-            Some(rom) => MMC1ChrChip {
-                chr_data: ChrData::Rom(rom),
-                chr_banks: if banks == 0 { 1 } else { banks },
-                ppu_vram: [0; 0x1000],
-                chr_bank: [0, 1],
-                chr_bank_offsets: [0, 0x1000],
-                load_register: LoadRegister::new(),
-                mirroring_mode: MirroringMode::OneScreenLowerBank,
-                chr_bank_mode: CHRBankMode::Switch4KB,
-            },
-            None => MMC1ChrChip {
-                chr_data: ChrData::Ram(Box::new([0; 0x2000])),
-                chr_banks: 2,
-                ppu_vram: [0; 0x1000],
-                chr_bank: [0, 1],
-                chr_bank_offsets: [0, 0x1000],
-                load_register: LoadRegister::new(),
-                mirroring_mode: MirroringMode::OneScreenLowerBank,
-                chr_bank_mode: CHRBankMode::Switch8KB,
-            },
+    fn new(chr_data: ChrData) -> Self {
+        MMC1ChrChip {
+            base: ChrBaseData::new(
+                MirroringMode::OneScreenLowerBank,
+                chr_data,
+                0x1000,
+                vec![0, 1],
+                vec![0, 0x1000],
+            ),
+            load_register: LoadRegister::new(),
+            chr_bank_mode: CHRBankMode::Switch4KB,
         }
     }
 
     fn update_control_register(&mut self, value: u8) {
-        self.mirroring_mode = match value & 0b11 {
+        self.base.mirroring_mode = match value & 0b11 {
             0b00 => MirroringMode::OneScreenLowerBank,
             0b01 => MirroringMode::OneScreenUpperBank,
             0b10 => MirroringMode::Vertical,
@@ -236,7 +230,7 @@ impl MMC1ChrChip {
 
         info!(
             "MMC1 Control register updated mirroring mode: {:?}, chr bank mode {:?}",
-            self.mirroring_mode, self.chr_bank_mode
+            self.base.mirroring_mode, self.chr_bank_mode
         );
 
         self.update_bank_offsets();
@@ -245,37 +239,29 @@ impl MMC1ChrChip {
     fn update_chr_bank(&mut self, value: u8, bank: usize) {
         debug_assert!(bank <= 1);
 
-        self.chr_bank[bank] = match self.chr_bank_mode {
-            CHRBankMode::Switch4KB => (value & 0b1_1111) % self.chr_banks,
-            CHRBankMode::Switch8KB => (value & 0b1_1110) % self.chr_banks,
+        self.base.banks[bank] = match self.chr_bank_mode {
+            CHRBankMode::Switch4KB => (value as usize & 0b1_1111) % self.base.total_banks,
+            CHRBankMode::Switch8KB => (value as usize & 0b1_1110) % self.base.total_banks,
         };
 
         self.update_bank_offsets();
 
         info!(
-            "CHR banks updated to {:02X}, {:02X}, offsets to {:04X}, {:04X} - Mode {:?} from value {:02X} on bank {:02X}",
-            self.chr_bank[0], self.chr_bank[1], self.chr_bank_offsets[0], self.chr_bank_offsets[1], self.chr_bank_mode, value, bank
+            "CHR banks updated to {:?}, offsets to {:?} - Mode {:?} from value {:02X} on bank {:02X}",
+            self.base.banks, self.base.bank_offsets, self.chr_bank_mode, value, bank
         );
     }
 
     fn update_bank_offsets(&mut self) {
         match self.chr_bank_mode {
             CHRBankMode::Switch4KB => {
-                self.chr_bank_offsets[0] = self.chr_bank[0] as usize * 0x1000;
-                self.chr_bank_offsets[1] = self.chr_bank[1] as usize * 0x1000;
+                self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x1000;
+                self.base.bank_offsets[1] = self.base.banks[1] as usize * 0x1000;
             }
             CHRBankMode::Switch8KB => {
-                self.chr_bank_offsets[0] = self.chr_bank[0] as usize * 0x1000;
-                self.chr_bank_offsets[1] = self.chr_bank_offsets[0] + 0x1000;
+                self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x1000;
+                self.base.bank_offsets[1] = self.base.bank_offsets[0] + 0x1000;
             }
-        }
-    }
-
-    fn get_banked_address(address: u16, bank_offset_0: usize, bank_offset_1: usize) -> usize {
-        if address & 0x1000 == 0 {
-            address as usize + bank_offset_0
-        } else {
-            (address & 0xFFF) as usize + bank_offset_1
         }
     }
 }
@@ -288,45 +274,11 @@ impl PpuCartridgeAddressBus for MMC1ChrChip {
     fn update_vram_address(&mut self, _: u16, _: PpuCycle) {}
 
     fn read_byte(&mut self, address: u16, _: PpuCycle) -> u8 {
-        match address {
-            0x0000..=0x1FFF => {
-                let adjusted_address =
-                    MMC1ChrChip::get_banked_address(address, self.chr_bank_offsets[0], self.chr_bank_offsets[1]);
-
-                match &self.chr_data {
-                    ChrData::Rom(rom) => rom[adjusted_address as usize],
-                    ChrData::Ram(ram) => ram[adjusted_address as usize],
-                }
-            }
-            0x2000..=0x3EFF => {
-                let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
-
-                self.ppu_vram[mirrored_address as usize]
-            }
-            0x3F00..=0x3FFF => panic!("Shouldn't be reading from palette RAM through cartridge bus"),
-            _ => panic!("Reading from {:04X} invalid for CHR address bus", address),
-        }
+        self.base.read_byte(address)
     }
 
     fn write_byte(&mut self, address: u16, value: u8, _: PpuCycle) {
-        debug!("MMC1 CHR write {:04X}={:02X}", address, value);
-        match address {
-            0x0000..=0x1FFF => {
-                if let ChrData::Ram(ram) = &mut self.chr_data {
-                    let adjusted_address =
-                        MMC1ChrChip::get_banked_address(address, self.chr_bank_offsets[0], self.chr_bank_offsets[1]);
-
-                    ram[adjusted_address as usize] = value
-                }
-            }
-            0x2000..=0x3EFF => {
-                let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
-
-                self.ppu_vram[mirrored_address as usize] = value;
-            }
-            0x3F00..=0x3FFF => panic!("Shouldn't be writing to palette registers through the cartridge address bus"),
-            _ => panic!("Write to {:04X} ({:02X}) invalid for CHR address bus", address, value),
-        }
+        self.base.write_byte(address, value);
     }
 
     fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: CpuCycle) {
@@ -376,8 +328,16 @@ pub(crate) fn from_header(
     CartridgeHeader,
 ) {
     (
-        Box::new(MMC1PrgChip::new(prg_rom, header.prg_rom_16kb_units)),
-        Box::new(MMC1ChrChip::new(chr_rom, header.chr_rom_8kb_units * 2)),
+        Box::new(MMC1PrgChip::new(
+            prg_rom,
+            header.prg_rom_16kb_units as usize,
+            match header.mapper {
+                1 => MMC1Variant::MMC1,
+                155 => MMC1Variant::MMC1A,
+                _ => panic!("Mapper {} isn't mapped to MMC1", header.mapper),
+            },
+        )),
+        Box::new(MMC1ChrChip::new(ChrData::from(chr_rom))),
         header,
     )
 }
@@ -385,50 +345,51 @@ pub(crate) fn from_header(
 #[cfg(test)]
 mod mmc1_tests {
     use super::{MMC1PrgChip, PRGBankMode};
+    use cartridge::mappers::mmc1::MMC1Variant;
     use cartridge::CpuCartridgeAddressBus;
 
     #[test]
     fn test_change_bank() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, MMC1Variant::MMC1);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
-        assert_eq!(mmc1.prg_bank, 0);
+        assert_eq!(mmc1.base.banks[0], 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
-        assert_eq!(mmc1.prg_bank, 1);
+        assert_eq!(mmc1.base.banks[0], 1);
     }
 
     #[test]
     fn test_change_bank_needs_wrap() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 2], 2);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 2], 2, MMC1Variant::MMC1);
         mmc1.write_byte(0xE000, 0b0011, 0);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
-        assert_eq!(mmc1.prg_bank, 0);
+        assert_eq!(mmc1.base.banks[0], 0);
         mmc1.write_byte(0xE000, 0b0000, 0);
-        assert_eq!(mmc1.prg_bank, 1);
+        assert_eq!(mmc1.base.banks[0], 1);
     }
 
     #[test]
     fn test_ignore_sequential_writes() {
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, MMC1Variant::MMC1);
         mmc1.write_byte(0xE000, 0b0001, 0);
         mmc1.write_byte(0xE000, 0b0000, 2);
         mmc1.write_byte(0xE000, 0b0000, 4);
         mmc1.write_byte(0xE000, 0b0000, 6);
-        assert_eq!(mmc1.prg_bank, 0);
+        assert_eq!(mmc1.base.banks[0], 0);
         mmc1.write_byte(0xE000, 0b0000, 7); // This write is ignored because it happens on the next cycle
-        assert_eq!(mmc1.prg_bank, 0);
+        assert_eq!(mmc1.base.banks[0], 0);
         mmc1.write_byte(0xE000, 0b0000, 9);
-        assert_eq!(mmc1.prg_bank, 1);
+        assert_eq!(mmc1.base.banks[0], 1);
     }
 
     #[test]
     fn test_set_control_register() {
         let value = 0b1111;
-        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16);
+        let mut mmc1 = MMC1PrgChip::new(vec![0; 0x4000 * 16], 16, MMC1Variant::MMC1);
         mmc1.write_byte(0x8000, 0, 0);
         mmc1.write_byte(0x8000, 0, 2);
         mmc1.write_byte(0x8000, 0, 4);

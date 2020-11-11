@@ -4,7 +4,7 @@ mod sprites;
 
 use cartridge::PpuCartridgeAddressBus;
 use cpu::interrupts::Interrupt;
-use log::{debug, error, info};
+use log::{debug, info};
 use ppu::palette::PaletteRam;
 use ppu::registers::ppuctrl::{IncrementMode, PpuCtrl};
 use ppu::registers::ppumask::PpuMask;
@@ -103,10 +103,6 @@ impl InternalRegisters {
 
     fn coarse_y(&self) -> u8 {
         ((self.vram_addr >> 5) & 0b0001_1111) as u8
-    }
-
-    fn nametable(&self) -> u8 {
-        ((self.vram_addr >> 10) & 0b111) as u8
     }
 
     fn fine_y(&self) -> u8 {

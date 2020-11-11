@@ -13,7 +13,7 @@ use cpu::status_flags::StatusFlags;
 use io::Button;
 use io::Controller;
 use io::Io;
-use log::{debug, error, info};
+use log::{debug, info};
 use ppu::Ppu;
 use ppu::SCREEN_HEIGHT;
 use ppu::SCREEN_WIDTH;

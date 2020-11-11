@@ -1,44 +1,79 @@
-use cartridge::mappers::{BankedChrChip, BankedPrgChip};
+use cartridge::mappers::{ChrBaseData, ChrData, PrgBaseData};
 use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;
 use cartridge::PpuCartridgeAddressBus;
 use log::info;
 
-/// AxROM has a single 32KB switchable bank driven by PRG 0-2
-fn axrom_update_prg_banks(
-    address: u16,
-    value: u8,
-    total_banks: u8,
-    banks: &mut [u8; 4],
-    bank_offsets: &mut [usize; 4],
-) {
-    if let 0x8000..=0xFFFF = address {
-        banks[0] = (value & 0b111) % total_banks;
-        bank_offsets[0] = banks[0] as usize * 0x8000;
-        bank_offsets[1] = bank_offsets[0] + 0x2000;
-        bank_offsets[2] = bank_offsets[1] + 0x2000;
-        bank_offsets[3] = bank_offsets[2] + 0x2000;
-        info!("AxROM PRG Bank switch {:?} -> {:?}", banks, bank_offsets);
+struct AxRomPrgChip {
+    base: PrgBaseData,
+}
+
+impl AxRomPrgChip {
+    fn new(prg_rom: Vec<u8>, total_banks: usize) -> Self {
+        AxRomPrgChip {
+            base: PrgBaseData::new(prg_rom, None, total_banks, 0x8000, vec![0], vec![0]),
+        }
+    }
+}
+
+impl CpuCartridgeAddressBus for AxRomPrgChip {
+    fn read_byte(&self, address: u16) -> u8 {
+        self.base.read_byte(address)
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        self.base.write_byte(address, value);
+
+        // AxROM has a single 32KB switchable bank driven by PRG 0-2
+        if let 0x8000..=0xFFFF = address {
+            self.base.banks[0] = (value as usize & 0b111) % self.base.total_banks;
+            self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x8000;
+            info!(
+                "AxROM PRG Bank switch {:?} -> {:?}",
+                self.base.banks, self.base.bank_offsets
+            );
+        }
     }
 }
 
 /// AxROM doesn't bank it's CHRROM/RAM but it is possible to switch mirroring
 /// mode through PRG 4
-fn axrom_chr_cpu_write_fn(
-    address: u16,
-    value: u8,
-    _: u8,
-    _: &mut u8,
-    _: &mut usize,
-    mirroring_mode: &mut MirroringMode,
-) {
-    if let 0x8000..=0xFFFF = address {
-        *mirroring_mode = if value & 0b1_0000 == 0 {
-            MirroringMode::OneScreenLowerBank
-        } else {
-            MirroringMode::OneScreenUpperBank
-        };
+struct AxRomChrChip {
+    base: ChrBaseData,
+}
+
+impl AxRomChrChip {
+    pub(super) fn new(chr_data: ChrData, mirroring_mode: MirroringMode) -> Self {
+        AxRomChrChip {
+            base: ChrBaseData::new(mirroring_mode, chr_data, 0x2000, vec![0], vec![0]),
+        }
+    }
+}
+
+impl PpuCartridgeAddressBus for AxRomChrChip {
+    fn check_trigger_irq(&mut self, _: bool) -> bool {
+        false
+    }
+
+    fn update_vram_address(&mut self, _: u16, _: u32) {}
+
+    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
+        self.base.read_byte(address)
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        self.base.write_byte(address, value);
+    }
+
+    fn cpu_write_byte(&mut self, address: u16, value: u8, _: u32) {
+        if let 0x8000..=0xFFFF = address {
+            self.base.mirroring_mode = if value & 0b1_0000 == 0 {
+                MirroringMode::OneScreenLowerBank
+            } else {
+                MirroringMode::OneScreenUpperBank
+            };
+        }
     }
 }
 
@@ -53,19 +88,10 @@ pub(crate) fn from_header(
 ) {
     info!("Creating AxROM mapper for cartridge {:?}", header);
     (
-        Box::new(BankedPrgChip::new(
-            prg_rom,
-            None,
-            header.prg_rom_16kb_units / 2,
-            [0, 1, 2, 3],
-            [0, 0x2000, 0x4000, 0x6000],
-            axrom_update_prg_banks,
-        )),
-        Box::new(BankedChrChip::new(
-            chr_rom,
+        Box::new(AxRomPrgChip::new(prg_rom, header.prg_rom_16kb_units as usize / 2)),
+        Box::new(AxRomChrChip::new(
+            ChrData::from(chr_rom),
             MirroringMode::OneScreenLowerBank,
-            header.chr_rom_8kb_units,
-            axrom_chr_cpu_write_fn,
         )),
         header,
     )

@@ -2,9 +2,7 @@ use apu::dmc_channel::DmcChannel;
 use apu::noise_channel::NoiseChannel;
 use apu::pulse_channel::PulseChannel;
 use apu::triangle_channel::TriangleChannel;
-use cpu::interrupts::Interrupt;
-use cpu::CpuCycle;
-use log::{debug, info};
+use log::info;
 
 mod dmc_channel;
 mod length_counter;

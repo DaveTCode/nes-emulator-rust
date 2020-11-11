@@ -1,149 +1,79 @@
 use cartridge::mirroring::MirroringMode;
-use cartridge::{CpuCartridgeAddressBus, PpuCartridgeAddressBus};
-use cpu::CpuCycle;
 use log::debug;
-use ppu::PpuCycle;
 
 pub(super) mod axrom; // Mapper 7
 pub(super) mod cnrom; // Mapper 3
 pub(super) mod mmc1; // Mapper 1
 pub(super) mod mmc2; // Mapper 9
 pub(super) mod mmc3; // Mapper 4
+pub(super) mod mmc4; // Mapper 10
 pub(super) mod nrom; // Mapper 0
 pub(super) mod uxrom; // Mapper 2, 94, 180
 
+#[derive(Debug)]
 pub(crate) enum ChrData {
     Rom(Vec<u8>),
     Ram(Box<[u8; 0x2000]>),
 }
 
-pub(super) struct BankedPrgChip {
-    prg_rom: Vec<u8>,
-    prg_ram: Option<[u8; 0x2000]>,
-    total_banks: u8,
-    prg_rom_banks: [u8; 4],
-    prg_rom_bank_offsets: [usize; 4],
-    write_byte_function: fn(u16, u8, u8, &mut [u8; 4], &mut [usize; 4]) -> (),
-}
-
-impl BankedPrgChip {
-    pub(super) fn new(
-        prg_rom: Vec<u8>,
-        prg_ram: Option<[u8; 0x2000]>,
-        total_banks: u8,
-        prg_rom_banks: [u8; 4],
-        prg_rom_bank_offsets: [usize; 4],
-        write_byte_function: fn(u16, u8, u8, &mut [u8; 4], &mut [usize; 4]) -> (),
-    ) -> Self {
-        let full_prg_rom = match prg_rom.len() {
-            0x4000 => {
-                let mut full = prg_rom.clone();
-                full.extend(prg_rom);
-
-                full
-            }
-            _ => prg_rom,
-        };
-
-        BankedPrgChip {
-            prg_rom: full_prg_rom,
-            prg_ram,
-            total_banks,
-            prg_rom_banks,
-            prg_rom_bank_offsets,
-            write_byte_function,
+impl From<Option<Vec<u8>>> for ChrData {
+    fn from(chr_rom: Option<Vec<u8>>) -> Self {
+        match chr_rom {
+            Some(rom) => ChrData::Rom(rom),
+            None => ChrData::Ram(Box::new([0; 0x2000])),
         }
     }
 }
 
-impl CpuCartridgeAddressBus for BankedPrgChip {
-    fn read_byte(&self, address: u16) -> u8 {
-        match address {
-            0x6000..=0x7FFF => match self.prg_ram {
-                None => 0x0,
-                Some(ram) => ram[(address - 0x6000) as usize],
-            },
-            0x8000..=0x9FFF => self.prg_rom[self.prg_rom_bank_offsets[0] + (address as usize - 0x8000)],
-            0xA000..=0xBFFF => self.prg_rom[self.prg_rom_bank_offsets[1] + (address as usize - 0xA000)],
-            0xC000..=0xDFFF => self.prg_rom[self.prg_rom_bank_offsets[2] + (address as usize - 0xC000)],
-            0xE000..=0xFFFF => self.prg_rom[self.prg_rom_bank_offsets[3] + (address as usize - 0xE000)],
-            _ => 0x0, // TODO - Not 100% sure on this, but mapper tests do check it.
-        }
-    }
-
-    fn write_byte(&mut self, address: u16, value: u8, _: PpuCycle) {
-        debug!("Mapper write {:04X}={:02X}", address, value);
-
-        match address {
-            0x6000..=0x7FFF => match self.prg_ram {
-                None => (),
-                Some(mut ram) => ram[(address - 0x6000) as usize] = value,
-            },
-            0x8000..=0xFFFF => (self.write_byte_function)(
-                address,
-                value,
-                self.total_banks,
-                &mut self.prg_rom_banks,
-                &mut self.prg_rom_bank_offsets,
-            ),
-            _ => (), // TODO - Not 100% sure on this, but mapper tests do check it.
-        }
-    }
-}
-
-pub(crate) struct BankedChrChip {
+/// This structure contains common information used by all CHR units on all mappers
+#[derive(Debug)]
+pub(crate) struct ChrBaseData {
+    mirroring_mode: MirroringMode,
     chr_data: ChrData,
     ppu_vram: [u8; 0x1000],
-    total_chr_banks: u8,
-    chr_bank: u8,
-    chr_bank_offset: usize,
-    mirroring_mode: MirroringMode,
-    cpu_write_byte_fn: fn(u16, u8, u8, &mut u8, &mut usize, &mut MirroringMode) -> (),
+    bank_size: usize,
+    total_banks: usize,
+    banks: Vec<usize>,
+    bank_offsets: Vec<usize>,
 }
 
-impl BankedChrChip {
-    pub(super) fn new(
-        chr_rom: Option<Vec<u8>>,
+impl ChrBaseData {
+    fn new(
         mirroring_mode: MirroringMode,
-        total_chr_banks: u8,
-        cpu_write_byte_fn: fn(u16, u8, u8, &mut u8, &mut usize, &mut MirroringMode) -> (),
+        chr_data: ChrData,
+        bank_size: usize,
+        banks: Vec<usize>,
+        bank_offsets: Vec<usize>,
     ) -> Self {
-        match chr_rom {
-            Some(rom) => BankedChrChip {
-                chr_data: ChrData::Rom(rom),
-                ppu_vram: [0; 0x1000],
-                total_chr_banks,
-                chr_bank: 0,
-                chr_bank_offset: 0,
-                mirroring_mode,
-                cpu_write_byte_fn,
-            },
-            None => BankedChrChip {
-                chr_data: ChrData::Ram(Box::new([0; 0x2000])),
-                ppu_vram: [0; 0x1000],
-                total_chr_banks,
-                chr_bank: 0,
-                chr_bank_offset: 0,
-                mirroring_mode,
-                cpu_write_byte_fn,
-            },
+        debug_assert!(banks.len() == bank_offsets.len());
+
+        let total_banks = match &chr_data {
+            ChrData::Ram(_) => 0x2000 / bank_size,
+            ChrData::Rom(rom) => rom.len() / bank_size,
+        };
+
+        ChrBaseData {
+            mirroring_mode,
+            chr_data,
+            total_banks: if total_banks == 0 { 1 } else { total_banks },
+            bank_size,
+            banks,
+            bank_offsets,
+            ppu_vram: [0; 0x1000],
         }
     }
-}
 
-impl PpuCartridgeAddressBus for BankedChrChip {
-    fn check_trigger_irq(&mut self, _: bool) -> bool {
-        false
-    }
-
-    fn update_vram_address(&mut self, _: u16, _: PpuCycle) {}
-
-    fn read_byte(&mut self, address: u16, _: PpuCycle) -> u8 {
+    fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x0000..=0x1FFF => match &self.chr_data {
-                ChrData::Rom(rom) => rom[address as usize + self.chr_bank_offset],
-                ChrData::Ram(ram) => ram[address as usize],
-            },
+            0x0000..=0x1FFF => {
+                let bank = address as usize / self.bank_size;
+                let offset = bank * self.bank_size;
+
+                match &self.chr_data {
+                    ChrData::Rom(rom) => rom[address as usize - offset + self.bank_offsets[bank]],
+                    ChrData::Ram(ram) => ram[address as usize - offset + self.bank_offsets[bank]],
+                }
+            }
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
                 debug!("Read {:04X} mirrored to {:04X}", address, mirrored_address);
@@ -155,12 +85,17 @@ impl PpuCartridgeAddressBus for BankedChrChip {
         }
     }
 
-    fn write_byte(&mut self, address: u16, value: u8, _: PpuCycle) {
-        debug!("MMC1 CHR write {:04X}={:02X}", address, value);
+    fn write_byte(&mut self, address: u16, value: u8) {
+        debug!("CHR write {:04X}={:02X}", address, value);
+
         match address {
             0x0000..=0x1FFF => match &mut self.chr_data {
                 ChrData::Rom(_) => (),
-                ChrData::Ram(ram) => ram[address as usize] = value,
+                ChrData::Ram(ram) => {
+                    let bank = address as usize / self.bank_size;
+                    let offset = bank * self.bank_size;
+                    ram[address as usize - offset + self.bank_offsets[bank]] = value
+                }
             },
             0x2000..=0x3EFF => {
                 let mirrored_address = self.mirroring_mode.get_mirrored_address(address);
@@ -171,20 +106,73 @@ impl PpuCartridgeAddressBus for BankedChrChip {
             _ => panic!("Write to {:04X} ({:02X}) invalid for CHR address bus", address, value),
         }
     }
+}
 
-    fn cpu_write_byte(&mut self, address: u16, value: u8, cycles: CpuCycle) {
-        debug!(
-            "CPU write to CHR bus {:04X}={:02X} at {:} cycles",
-            address, value, cycles
-        );
+pub(crate) struct PrgBaseData {
+    prg_rom: Vec<u8>,
+    prg_ram: Option<[u8; 0x2000]>,
+    total_banks: usize,
+    bank_size: usize,
+    banks: Vec<usize>,
+    bank_offsets: Vec<usize>,
+}
 
-        (self.cpu_write_byte_fn)(
-            address,
-            value,
-            self.total_chr_banks,
-            &mut self.chr_bank,
-            &mut self.chr_bank_offset,
-            &mut self.mirroring_mode,
-        );
+impl PrgBaseData {
+    pub(super) fn new(
+        prg_rom: Vec<u8>,
+        prg_ram: Option<[u8; 0x2000]>,
+        total_banks: usize,
+        bank_size: usize,
+        banks: Vec<usize>,
+        bank_offsets: Vec<usize>,
+    ) -> Self {
+        let full_prg_rom = match prg_rom.len() {
+            0x4000 => {
+                let mut full = prg_rom.clone();
+                full.extend(prg_rom);
+
+                full
+            }
+            _ => prg_rom,
+        };
+
+        debug_assert!(banks.len() == bank_offsets.len());
+        debug_assert!(total_banks * bank_size == full_prg_rom.len());
+
+        PrgBaseData {
+            prg_rom: full_prg_rom,
+            prg_ram,
+            total_banks,
+            bank_size,
+            banks,
+            bank_offsets,
+        }
+    }
+
+    pub(crate) fn read_byte(&self, address: u16) -> u8 {
+        match address {
+            0x6000..=0x7FFF => match self.prg_ram {
+                None => 0x0,
+                Some(ram) => ram[(address - 0x6000) as usize],
+            },
+            0x8000..=0xFFFF => {
+                let bank = (address as usize - 0x8000) / self.bank_size;
+                let offset = bank * self.bank_size;
+
+                self.prg_rom[self.bank_offsets[bank] + (address as usize) - offset - 0x8000]
+            }
+            _ => 0x0,
+        }
+    }
+
+    pub(crate) fn write_byte(&mut self, address: u16, value: u8) {
+        debug!("Mapper write {:04X}={:02X}", address, value);
+
+        if let 0x6000..=0x7FFF = address {
+            match self.prg_ram {
+                None => (),
+                Some(mut ram) => ram[(address - 0x6000) as usize] = value,
+            }
+        }
     }
 }

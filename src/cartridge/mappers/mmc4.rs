@@ -13,14 +13,14 @@ struct Mmc4PrgChip {
 impl Mmc4PrgChip {
     fn new(prg_rom: Vec<u8>, total_banks: usize) -> Self {
         Mmc4PrgChip {
-            base: PrgBaseData {
+            base: PrgBaseData::new(
                 prg_rom,
-                prg_ram: None,
+                None,
                 total_banks,
-                bank_size: 0x2000,
-                banks: vec![0, total_banks - 1],
-                bank_offsets: vec![0, (total_banks - 1) * 0x4000],
-            },
+                0x4000,
+                vec![0, total_banks - 1],
+                vec![0, (total_banks - 1) * 0x4000],
+            ),
         }
     }
 }

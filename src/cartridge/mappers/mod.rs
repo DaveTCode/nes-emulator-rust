@@ -137,7 +137,13 @@ impl PrgBaseData {
         };
 
         debug_assert!(banks.len() == bank_offsets.len());
-        debug_assert!(total_banks * bank_size == full_prg_rom.len());
+        debug_assert!(
+            total_banks * bank_size == full_prg_rom.len(),
+            "{} * {} != {}",
+            total_banks,
+            bank_size,
+            full_prg_rom.len()
+        );
 
         PrgBaseData {
             prg_rom: full_prg_rom,

@@ -151,7 +151,7 @@ impl InternalRegisters {
     }
 }
 
-pub(crate) struct Ppu {
+pub struct Ppu {
     pub(crate) total_cycles: PpuCycle,
     scanline_state: ScanlineState,
     sprite_data: SpriteData,
@@ -171,7 +171,7 @@ pub(crate) struct Ppu {
 }
 
 impl Ppu {
-    pub(super) fn new(chr_address_bus: Box<dyn PpuCartridgeAddressBus>) -> Self {
+    pub fn new(chr_address_bus: Box<dyn PpuCartridgeAddressBus>) -> Self {
         Ppu {
             total_cycles: 27,
             scanline_state: ScanlineState {

@@ -51,7 +51,7 @@ impl FrameCounter {
     }
 }
 
-pub(crate) struct Apu {
+pub struct Apu {
     pulse_channel_1: PulseChannel,
     pulse_channel_2: PulseChannel,
     triangle_channel: TriangleChannel,
@@ -64,7 +64,7 @@ pub(crate) struct Apu {
 }
 
 impl Apu {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Apu {
             pulse_channel_1: PulseChannel::new("Pulse 1".to_string()),
             pulse_channel_2: PulseChannel::new("Pulse 2".to_string()),

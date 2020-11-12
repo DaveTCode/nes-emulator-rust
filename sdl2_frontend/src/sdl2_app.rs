@@ -1,13 +1,11 @@
-use apu::Apu;
-use cartridge::CartridgeHeader;
-use cartridge::CpuCartridgeAddressBus;
-use cartridge::PpuCartridgeAddressBus;
-use cpu::Cpu;
 use crc32fast::Hasher;
-use io::Io;
-use io::{Button, Controller};
 use log::info;
-use ppu::Ppu;
+use rust_nes::apu::Apu;
+use rust_nes::cartridge::{CartridgeHeader, CpuCartridgeAddressBus, PpuCartridgeAddressBus};
+use rust_nes::cpu::Cpu;
+use rust_nes::io::Io;
+use rust_nes::io::{Button, Controller};
+use rust_nes::ppu::Ppu;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
@@ -21,7 +19,7 @@ pub(crate) fn run(
     prg_address_bus: Box<dyn CpuCartridgeAddressBus>,
     chr_address_bus: Box<dyn PpuCartridgeAddressBus>,
     cartridge_header: CartridgeHeader,
-) {
+) -> std::io::Result<()> {
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
     let window = video_subsystem
@@ -102,11 +100,11 @@ pub(crate) fn run(
                             let mut oam_ram_file = File::create("oam_ram.csv").unwrap();
 
                             for b in vram.iter() {
-                                writeln!(vram_file, "{:02X}", b);
+                                writeln!(vram_file, "{:02X}", b)?;
                             }
 
                             for b in oam_ram.iter() {
-                                writeln!(oam_ram_file, "{:02X}", b);
+                                writeln!(oam_ram_file, "{:02X}", b)?;
                             }
                         }
                         _ => (),
@@ -138,4 +136,6 @@ pub(crate) fn run(
             }
         }
     }
+
+    Ok(())
 }

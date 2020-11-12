@@ -33,6 +33,25 @@ impl SweepUnit {
 }
 
 #[derive(Debug)]
+struct Envelope {
+    constant_volume: u8,
+    use_envelope: bool,
+    envelope_value: u8,
+    start_flag: bool,
+}
+
+impl Envelope {
+    fn new() -> Self {
+        Envelope {
+            constant_volume: 0,
+            use_envelope: false,
+            envelope_value: 0,
+            start_flag: false,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(super) struct PulseChannel {
     name: String,
     enabled: bool,
@@ -42,6 +61,7 @@ pub(super) struct PulseChannel {
     timer_load: u16,
     timer: u16,
     sweep_unit: SweepUnit,
+    envelope: Envelope,
 }
 
 impl PulseChannel {
@@ -55,6 +75,7 @@ impl PulseChannel {
             timer_load: 0,
             timer: 0,
             sweep_unit: SweepUnit::new(),
+            envelope: Envelope::new(),
         }
     }
 
@@ -75,7 +96,8 @@ impl PulseChannel {
             _ => panic!(),
         };
         self.length_counter.set_halt(value & 0b0010_0000 != 0);
-        // TODO - Envelope and constant volume flags
+        self.envelope.use_envelope = value & 0b0001_0000 != 0;
+        self.envelope.constant_volume = value & 0b1111;
     }
 
     /// Corresponds to writes to 0x4002 (pulse 1) & 0x4006 (pulse 2)
@@ -116,6 +138,13 @@ impl PulseChannel {
 
     pub(super) fn clock_sweep_unit(&mut self) {
         // TODO
+    }
+
+    pub(super) fn clock_envelope(&mut self) {
+        if self.envelope.start_flag {
+            self.envelope.start_flag = false;
+        } else {
+        }
     }
 
     /// Called once per APU clock (once every two CPU clocks) and steps the timer

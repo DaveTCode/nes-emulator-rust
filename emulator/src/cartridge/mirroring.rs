@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum MirroringMode {
+pub enum MirroringMode {
     OneScreenLowerBank,
     OneScreenUpperBank,
     Vertical,

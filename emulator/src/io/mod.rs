@@ -2,14 +2,14 @@ use log::debug;
 
 #[repr(u8)]
 #[derive(Debug)]
-pub(crate) enum Controller {
+pub enum Controller {
     One,
     Two,
 }
 
 #[repr(u8)]
 #[derive(Debug, PartialEq)]
-pub(crate) enum Button {
+pub enum Button {
     A,
     B,
     Select,
@@ -68,14 +68,14 @@ struct ControllerState {
 }
 
 #[derive(Debug)]
-pub(crate) struct Io {
+pub struct Io {
     controller_1_state: ControllerState,
     controller_2_state: ControllerState,
     strobe_register: bool,
 }
 
 impl Io {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Io {
             controller_1_state: ControllerState {
                 all_data: 0,
@@ -89,17 +89,17 @@ impl Io {
         }
     }
 
-    pub(crate) fn button_down(&mut self, controller: Controller, button: Button) {
+    pub(crate) fn button_down(&mut self, controller: Controller, nes_button: Button) {
         match controller {
-            Controller::One => self.controller_1_state.all_data |= button.bitflag(),
-            Controller::Two => self.controller_2_state.all_data |= button.bitflag(),
+            Controller::One => self.controller_1_state.all_data |= nes_button.bitflag(),
+            Controller::Two => self.controller_2_state.all_data |= nes_button.bitflag(),
         }
     }
 
-    pub(crate) fn button_up(&mut self, controller: Controller, button: Button) {
+    pub(crate) fn button_up(&mut self, controller: Controller, nes_button: Button) {
         match controller {
-            Controller::One => self.controller_1_state.all_data &= !button.bitflag(),
-            Controller::Two => self.controller_2_state.all_data &= !button.bitflag(),
+            Controller::One => self.controller_1_state.all_data &= !nes_button.bitflag(),
+            Controller::Two => self.controller_2_state.all_data &= !nes_button.bitflag(),
         }
     }
 
@@ -114,9 +114,9 @@ impl Io {
                 state.all_data & Button::A.bitflag()
             } else {
                 match &state.reading_button {
-                    Some(button) => {
-                        let result = button.read_bit(state.all_data);
-                        state.reading_button = button.next();
+                    Some(nes_button) => {
+                        let result = nes_button.read_bit(state.all_data);
+                        state.reading_button = nes_button.next();
                         result
                     }
                     None => 0b0000_0001,

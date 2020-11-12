@@ -552,6 +552,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nes_rom_db"
+version = "0.0.1"
+dependencies = [
+ "clap 3.0.0-beta.2",
+ "csv",
+ "rust_nes",
+ "serde",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -750,12 +760,10 @@ name = "rust_nes"
 version = "0.0.1"
 dependencies = [
  "bitflags",
- "clap 3.0.0-beta.2",
  "crc32fast",
  "criterion",
  "log",
  "log4rs",
- "sdl2",
  "zip",
 ]
 
@@ -814,6 +822,18 @@ dependencies = [
  "tar",
  "unidiff",
  "version-compare",
+]
+
+[[package]]
+name = "sdl2_frontend"
+version = "0.1.0"
+dependencies = [
+ "clap 3.0.0-beta.2",
+ "crc32fast",
+ "log",
+ "log4rs",
+ "rust_nes",
+ "sdl2",
 ]
 
 [[package]]

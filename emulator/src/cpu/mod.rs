@@ -109,10 +109,10 @@ enum CpuState {
 
 pub(crate) type CpuCycle = u32;
 
-pub(crate) struct Cpu<'a> {
+pub struct Cpu<'a> {
     state: State,
     registers: Registers,
-    pub(crate) cycles: CpuCycle,
+    pub cycles: CpuCycle,
     cpu_cycle_counter: u8,
     ram: [u8; 0x800],
     apu: &'a mut Apu,
@@ -125,7 +125,7 @@ pub(crate) struct Cpu<'a> {
 }
 
 impl<'a> Cpu<'a> {
-    pub(crate) fn new(
+    pub fn new(
         prg_address_bus: Box<dyn CpuCartridgeAddressBus>,
         apu: &'a mut Apu,
         io: &'a mut Io,
@@ -1070,23 +1070,23 @@ impl<'a> Cpu<'a> {
         self.cycles += 1;
     }
 
-    pub(super) fn button_down(&mut self, controller: Controller, button: Button) {
+    pub fn button_down(&mut self, controller: Controller, button: Button) {
         self.io.button_down(controller, button);
     }
 
-    pub(super) fn button_up(&mut self, controller: Controller, button: Button) {
+    pub fn button_up(&mut self, controller: Controller, button: Button) {
         self.io.button_up(controller, button);
     }
 
-    pub(super) fn is_frame_complete_cycle(&self) -> bool {
+    pub fn is_frame_complete_cycle(&self) -> bool {
         self.ppu.output_cycle()
     }
 
-    pub(super) fn get_framebuffer(&self) -> &[u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize] {
+    pub fn get_framebuffer(&self) -> &[u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize] {
         &self.ppu.frame_buffer
     }
 
-    pub(super) fn dump_ppu_state(&mut self, vram_clone: &mut [u8; 0x4000]) -> &[u8; 0x100] {
+    pub fn dump_ppu_state(&mut self, vram_clone: &mut [u8; 0x4000]) -> &[u8; 0x100] {
         self.ppu.dump_state(vram_clone)
     }
 }

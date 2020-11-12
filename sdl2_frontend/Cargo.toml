@@ -1,0 +1,17 @@
+[package]
+name = "sdl2_frontend"
+version = "0.1.0"
+authors = ["David Tyler <david.tyler@metaswitch.com>"]
+default-run = "nes-emulator"
+
+[dependencies]
+clap = "3.0.0-beta.2"
+crc32fast = "1.2.1"
+log = "0.4.11"
+log4rs = "1.0.0-alpha-2"
+rust_nes = { path = "../emulator" }
+sdl2 = { version = "0.34.3", features = ["bundled", "static-link"] }
+
+[[bin]]
+name = "nes-emulator"
+path = "src/main.rs"

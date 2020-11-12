@@ -1,0 +1,17 @@
+[package]
+name = "nes_rom_db"
+version = "0.0.1"
+authors = ["David Tyler <davet.code@gmail.com>"]
+repository = "https://github.com/DaveTCode/nes-emulator-rust.git"
+license = "MIT"
+publish = false
+
+[dependencies]
+clap = "3.0.0-beta.2"
+csv = "1.1.4"
+rust_nes = { path = "../emulator" }
+serde = { version = "1.0.117", features = ["derive"] }
+
+[[bin]]
+name = "nes-rom-db"
+path = "src/main.rs"

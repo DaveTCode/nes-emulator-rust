@@ -14,11 +14,13 @@ use std::io::Read;
 use std::path::Path;
 use zip::result::ZipError;
 use zip::ZipArchive;
+use Cartridge;
 
 /// Represents any error which occurs during loading a cartridge
 #[derive(Debug)]
-pub(crate) struct CartridgeError {
-    pub(crate) message: String,
+pub struct CartridgeError {
+    pub message: String,
+    pub mapper: Option<u8>,
 }
 impl Error for CartridgeError {}
 impl fmt::Display for CartridgeError {
@@ -30,6 +32,7 @@ impl From<io::Error> for CartridgeError {
     fn from(error: io::Error) -> Self {
         CartridgeError {
             message: error.to_string(),
+            mapper: None,
         }
     }
 }
@@ -37,12 +40,13 @@ impl From<ZipError> for CartridgeError {
     fn from(error: ZipError) -> Self {
         CartridgeError {
             message: error.to_string(),
+            mapper: None,
         }
     }
 }
 
 /// A trait representing the CPU address bus into the cartridge
-pub(crate) trait CpuCartridgeAddressBus {
+pub trait CpuCartridgeAddressBus {
     /// Read from the 16 bit CPU address bus
     fn read_byte(&self, address: u16) -> u8;
     /// Write to the 16 bit CPU address bus
@@ -50,7 +54,7 @@ pub(crate) trait CpuCartridgeAddressBus {
 }
 
 /// A trait representing the PPU address bus into the cartridge
-pub(crate) trait PpuCartridgeAddressBus {
+pub trait PpuCartridgeAddressBus {
     /// Certain mappers can trigger an IRQ based on scanline counting (MMC3)
     /// This function allows the CPU to poll and request state on whether an IRQ is ready to fire.
     fn check_trigger_irq(&mut self, clear: bool) -> bool;
@@ -68,12 +72,12 @@ pub(crate) trait PpuCartridgeAddressBus {
 /// Represents flags/details about the rom from the header
 /// c.f. http://wiki.nesdev.com/w/index.php/INES for details
 #[derive(Debug)]
-pub(crate) struct CartridgeHeader {
-    pub(crate) prg_rom_16kb_units: u8,
-    pub(crate) chr_rom_8kb_units: u8,
-    pub(crate) mapper: u8,
-    pub(crate) mirroring: MirroringMode,
-    pub(crate) ram_is_battery_backed: bool,
+pub struct CartridgeHeader {
+    pub prg_rom_16kb_units: u8,
+    pub chr_rom_8kb_units: u8,
+    pub mapper: u8,
+    pub mirroring: MirroringMode,
+    pub ram_is_battery_backed: bool,
     // TODO - Lots more flags and possible options
 }
 
@@ -103,16 +107,7 @@ impl fmt::Display for CartridgeHeader {
     }
 }
 
-pub(crate) fn from_file(
-    file_path: &str,
-) -> Result<
-    (
-        Box<dyn CpuCartridgeAddressBus>,
-        Box<dyn PpuCartridgeAddressBus>,
-        CartridgeHeader,
-    ),
-    CartridgeError,
-> {
+pub(crate) fn from_file(file_path: &str) -> Result<Cartridge, CartridgeError> {
     let file_extension = Path::new(file_path).extension().and_then(OsStr::to_str);
     let file = File::open(file_path)?;
 
@@ -137,6 +132,7 @@ pub(crate) fn from_file(
                 None => {
                     return Err(CartridgeError {
                         message: "The zip file must contain only one file with the .nes extension".to_string(),
+                        mapper: None,
                     });
                 }
                 Some(zip_file_index) => {
@@ -151,6 +147,7 @@ pub(crate) fn from_file(
     if bytes.len() < 0x10 {
         return Err(CartridgeError {
             message: format!("Invalid cartridge file {}, header < 16 bytes", file_path),
+            mapper: None,
         });
     }
 
@@ -164,7 +161,12 @@ pub(crate) fn from_file(
 
     if bytes.len() < chr_rom_end {
         return Err(CartridgeError {
-          message: format!("Invalid cartridge file {}, header specified {:x} prg rom units and {:x} chr rom units but total length was {:x}", file_path, header.prg_rom_16kb_units, header.chr_rom_8kb_units, bytes.len())
+          message: format!("Invalid cartridge file {}, header specified {:x} prg rom units and {:x} chr rom units but total length was {:x}",
+                           file_path,
+                           header.prg_rom_16kb_units,
+                           header.chr_rom_8kb_units,
+                           bytes.len()),
+          mapper: None,
         });
     }
 
@@ -187,6 +189,7 @@ pub(crate) fn from_file(
         66 => Ok(mappers::gxrom::from_header(prg_rom, chr_rom, header)),
         _ => Err(CartridgeError {
             message: format!("Mapper {} not yet implemented", header.mapper),
+            mapper: Some(header.mapper),
         }),
     }
 }

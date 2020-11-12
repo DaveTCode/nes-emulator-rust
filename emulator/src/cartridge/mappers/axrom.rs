@@ -45,6 +45,11 @@ impl PpuCartridgeAddressBus for AxRomChrChip {
     }
 }
 
+#[inline]
+fn axrom_address_is_control(address: u16) -> bool {
+    address >= 0x8000
+}
+
 pub(crate) fn from_header(
     prg_rom: Vec<u8>,
     chr_rom: Option<Vec<u8>>,
@@ -61,6 +66,7 @@ pub(crate) fn from_header(
             header.prg_rom_16kb_units as usize / 2,
             0b111,
             0,
+            axrom_address_is_control,
         )),
         Box::new(AxRomChrChip::new(
             ChrData::from(chr_rom),

@@ -10,6 +10,7 @@ pub(super) mod mmc1; // Mapper 1
 pub(super) mod mmc2; // Mapper 9
 pub(super) mod mmc3; // Mapper 4
 pub(super) mod mmc4; // Mapper 10
+pub(super) mod nina_003_006; // Mapper 079
 pub(super) mod nrom; // Mapper 0
 pub(super) mod uxrom; // Mapper 2, 94, 180
 
@@ -246,14 +247,17 @@ struct SingleBankedPrgChip {
     mask: u8,
     /// Right Shift applied to the value written to the register before turning into the bank (applied after mask)
     shift: u8,
+    /// Function which determines whether an address is the control register for this chip
+    control_register_check: fn(u16) -> bool,
 }
 
 impl SingleBankedPrgChip {
-    fn new(prg_rom: Vec<u8>, total_banks: usize, mask: u8, shift: u8) -> Self {
+    fn new(prg_rom: Vec<u8>, total_banks: usize, mask: u8, shift: u8, control_register_check: fn(u16) -> bool) -> Self {
         SingleBankedPrgChip {
             base: PrgBaseData::new(prg_rom, None, total_banks, 0x8000, vec![0], vec![0]),
             mask,
             shift,
+            control_register_check,
         }
     }
 }
@@ -266,10 +270,62 @@ impl CpuCartridgeAddressBus for SingleBankedPrgChip {
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
         self.base.write_byte(address, value);
 
-        if let 0x8000..=0xFFFF = address {
+        if (self.control_register_check)(address) {
             self.base.banks[0] = ((value & self.mask) >> self.shift) as usize % self.base.total_banks;
             self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x8000;
             info!("PRG Bank switch {:?} -> {:?}", self.base.banks, self.base.bank_offsets);
+        }
+    }
+}
+
+/// Straightforward CHR banked chip with one bank switched on 0x8000..0xFFFF
+/// Used in at least Cnrom & Uxrom variants
+pub(super) struct SingleBankedChrChip {
+    base: ChrBaseData,
+    /// Mask applied to the value in the register to determine bank (applied before shift)
+    mask: u8,
+    /// Shift applied to the value in the register to determine bank (applied after mask)
+    shift: u8,
+    /// Function which determines whether an address is the control register for this chip
+    control_register_check: fn(u16) -> bool,
+}
+
+impl SingleBankedChrChip {
+    pub(super) fn new(
+        chr_data: ChrData,
+        mirroring_mode: MirroringMode,
+        mask: u8,
+        shift: u8,
+        control_register_check: fn(u16) -> bool,
+    ) -> Self {
+        SingleBankedChrChip {
+            base: ChrBaseData::new(mirroring_mode, chr_data, 0x2000, vec![0], vec![0]),
+            mask,
+            shift,
+            control_register_check,
+        }
+    }
+}
+
+impl PpuCartridgeAddressBus for SingleBankedChrChip {
+    fn check_trigger_irq(&mut self, _: bool) -> bool {
+        false
+    }
+
+    fn update_vram_address(&mut self, _: u16, _: u32) {}
+
+    fn read_byte(&mut self, address: u16, _: u32) -> u8 {
+        self.base.read_byte(address)
+    }
+
+    fn write_byte(&mut self, address: u16, value: u8, _: u32) {
+        self.base.write_byte(address, value);
+    }
+
+    fn cpu_write_byte(&mut self, address: u16, value: u8, _: u32) {
+        if (self.control_register_check)(address) {
+            self.base.banks[0] = ((value & self.mask) >> self.shift) as usize % self.base.total_banks;
+            self.base.bank_offsets[0] = self.base.banks[0] as usize * 0x2000;
         }
     }
 }

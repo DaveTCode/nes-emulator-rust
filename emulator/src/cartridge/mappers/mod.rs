@@ -7,6 +7,7 @@ pub(super) mod bxrom; // Mapper 34 (note this is both BxROM and NINA-001 boards)
 pub(super) mod cnrom; // Mapper 3
 pub(super) mod color_dreams; // Mapper 11
 pub(super) mod gxrom; // Mapper 66
+pub(super) mod mapper_071; // Mapper 71
 pub(super) mod mmc1; // Mapper 1
 pub(super) mod mmc2; // Mapper 9
 pub(super) mod mmc3; // Mapper 4

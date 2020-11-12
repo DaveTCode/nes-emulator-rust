@@ -181,7 +181,9 @@ impl Apu {
 
     fn quarter_frame(&mut self) {
         info!("Running quarter frame update: apu_cycles={}", self.total_apu_cycles);
-        // TODO - Update envelopes
+        self.pulse_channel_1.clock_envelope();
+        self.pulse_channel_2.clock_envelope();
+        // TODO - Update envelopes on other channels
         self.triangle_channel.clock_linear_counter();
     }
 

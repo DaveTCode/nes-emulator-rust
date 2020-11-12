@@ -188,6 +188,7 @@ pub(crate) fn from_file(file_path: &str) -> Result<Cartridge, CartridgeError> {
         11 => Ok(mappers::color_dreams::from_header(prg_rom, chr_rom, header)),
         34 => Ok(mappers::bxrom::from_header(prg_rom, chr_rom, header)),
         66 => Ok(mappers::gxrom::from_header(prg_rom, chr_rom, header)),
+        71 => Ok(mappers::mapper_071::from_header(prg_rom, chr_rom, header)),
         79 => Ok(mappers::nina_003_006::from_header(prg_rom, chr_rom, header)),
         _ => Err(CartridgeError {
             message: format!("Mapper {} not yet implemented", header.mapper),

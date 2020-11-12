@@ -143,7 +143,9 @@ impl PulseChannel {
     pub(super) fn clock_envelope(&mut self) {
         if self.envelope.start_flag {
             self.envelope.start_flag = false;
+        // TODO - Other things that happen when clearing start flag
         } else {
+            // TODO
         }
     }
 

@@ -22,6 +22,7 @@ pub(crate) fn from_header(
     (
         Box::new(SingleBankedPrgChip::new(
             prg_rom,
+            None,
             header.prg_rom_16kb_units as usize / 2,
             0b11_0000,
             4,

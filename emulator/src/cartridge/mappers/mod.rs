@@ -3,6 +3,7 @@ use cartridge::{CpuCartridgeAddressBus, PpuCartridgeAddressBus};
 use log::{debug, info};
 
 pub(super) mod axrom; // Mapper 7
+pub(super) mod bxrom; // Mapper 34 (note this is both BxROM and NINA-001 boards)
 pub(super) mod cnrom; // Mapper 3
 pub(super) mod color_dreams; // Mapper 11
 pub(super) mod gxrom; // Mapper 66
@@ -161,7 +162,7 @@ impl PrgBaseData {
 
     pub(crate) fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0x6000..=0x7FFF => match self.prg_ram {
+            0x6000..=0x7FFF => match &self.prg_ram {
                 None => 0x0,
                 Some(ram) => ram[(address - 0x6000) as usize],
             },
@@ -179,11 +180,11 @@ impl PrgBaseData {
         debug!("Mapper write {:04X}={:02X}", address, value);
 
         if let 0x6000..=0x7FFF = address {
-            match self.prg_ram {
+            match &mut self.prg_ram {
                 None => (),
-                Some(mut ram) => ram[(address - 0x6000) as usize] = value,
+                Some(ram) => ram[(address - 0x6000) as usize] = value,
             }
-        }
+        };
     }
 }
 
@@ -252,9 +253,16 @@ struct SingleBankedPrgChip {
 }
 
 impl SingleBankedPrgChip {
-    fn new(prg_rom: Vec<u8>, total_banks: usize, mask: u8, shift: u8, control_register_check: fn(u16) -> bool) -> Self {
+    fn new(
+        prg_rom: Vec<u8>,
+        prg_ram: Option<[u8; 0x2000]>,
+        total_banks: usize,
+        mask: u8,
+        shift: u8,
+        control_register_check: fn(u16) -> bool,
+    ) -> Self {
         SingleBankedPrgChip {
-            base: PrgBaseData::new(prg_rom, None, total_banks, 0x8000, vec![0], vec![0]),
+            base: PrgBaseData::new(prg_rom, prg_ram, total_banks, 0x8000, vec![0], vec![0]),
             mask,
             shift,
             control_register_check,
@@ -269,6 +277,11 @@ impl CpuCartridgeAddressBus for SingleBankedPrgChip {
 
     fn write_byte(&mut self, address: u16, value: u8, _: u32) {
         self.base.write_byte(address, value);
+
+        if address == 0x7460 {
+            info!("{:?}", self.base.prg_ram);
+            debug_assert!(self.base.read_byte(address) == value);
+        }
 
         if (self.control_register_check)(address) {
             self.base.banks[0] = ((value & self.mask) >> self.shift) as usize % self.base.total_banks;

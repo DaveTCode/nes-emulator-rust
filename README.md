@@ -19,13 +19,14 @@ used to play games or to debug other emulators and has no features beyond "run t
 
 - APU is only partially complete (no DMC) and does not yet output audio (no mixer and no provision for sending 
 the samples anywhere)
-- Only a few key mappers supported (0, 1, 2, 3, 4, 7, 9)
+- ~600 ROMs without mapper support out of the ~4000 total
 - No support for peripherals beyond a standard NES controller
-- Support only provided for NTSC device
+- Support only provided for NTSC timings
+- No optimisation. It runs at >60fps on my development machine so no rush to optimise.
 
 ## Architecture
 
-There are many rust emulators, this one differs slightly in that it is entirely compile time checked code, it contains
+There are many rust NES emulators, this one differs slightly in that it is entirely compile time checked code, it contains
 no unsafe blocks (except those in dependencies) and no Rc<RefCell<>> for runtime checking. This is achieved through the 
 following architecture:
 
@@ -63,15 +64,14 @@ At present there's only a single benchmark, it runs the "spritecans" test rom fo
 presently checked into the code base.
 
 ```shell script
-Benchmarking spritecans 100 frames: Warming up for 3.0000 s
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 15.1s, or reduce sample count to 30.
-spritecans 100 frames   time:   [136.67 ms 139.07 ms 141.79 ms]
-                        change: [-16.859% -13.771% -10.553%] (p = 0.00 < 0.05)
-                        Performance has improved.
-Found 5 outliers among 100 measurements (5.00%)
-  2 (2.00%) high mild
-  3 (3.00%) high severe
+Benchmarking spritecans 100 frames: Collecting 100 samples in estimated 16.503 s (100 iterations)
+Benchmarking spritecans 100 frames: Analyzing
+spritecans 100 frames   time:   [148.33 ms 150.97 ms 153.92 ms]
+                        change: [+2.1495% +4.7664% +7.4174%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 10 outliers among 100 measurements (10.00%)
+  6 (6.00%) high mild
+  4 (4.00%) high severe
 ```
 
-is the most recent execution, note that the high percentage change appears to fluctuate. This area needs work as the 
-benchmark includes loading the file from disk as well as actually rendering frames. 
+is the most recent execution. It's not yet clear how useful that benchmark is, I haven't spent time optimising yet. 

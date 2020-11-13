@@ -89,9 +89,10 @@ rom_tests! {
     sprite_overflow: (0xDAFD85 * 3 as usize, 1808572613, Path::new("..").join("roms").join("test").join("ppu_sprite_overflow").join("ppu_sprite_overflow.nes")),
 
     // ----- Mapper Tests -----
-    mapper_0_p32k_c8k_v: (0x56A32 * 3 as usize, 1942926564, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M0_P32K_C8K_V.nes")),
-    mapper_0_p32k_cr8k_v: (0x270AAB * 3 as usize, 3621921473, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR8K_V.nes")),
-    mapper_0_p32k_cr32k_v: (0x270AAB * 3 as usize, 3621921473, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR32K_V.nes")),
+    mapper_0_p32k_c8k_v: (0x309599 * 3 as usize, 1798638175, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M0_P32K_C8K_V.nes")),
+    mapper_0_p32k_cr8k_v: (0x50D915 * 3 as usize, 3474562170, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR8K_V.nes")),
+    // TODO - Below is likely wrong, we don't have 32KB CHR RAM in the screenshot
+    mapper_0_p32k_cr32k_v: (0x4C4DC8 * 3 as usize, 3474562170, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M0_P32K_CR32K_V.nes")),
     mapper_1_no_chrom: (0x4F7C0F * 3 as usize, 1531525988, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M1_P128K.nes")),
     mapper_1_p128k_c32k: (0x3C6627 * 3 as usize, 3934498320, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K.nes")),
     mapper_1_p128k_c32k_s8k: (0x3C6627 * 3 as usize, 3934498320, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C32K_S8K.nes")),
@@ -101,24 +102,24 @@ rom_tests! {
     mapper_1_p128k_c128k_w8k: (0x3C6627 * 3 as usize, 2354549445, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_W8K.nes")),
     mapper_2_p128k_cr8k_v: (0x253959 * 3 as usize, 1058817094, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M2_P128K_CR8K_V.nes")),
     mapper_2_p128k_v: (0x24C505 * 3 as usize, 3178533875, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),
-    mapper_3: (0x90CD6 * 3 as usize, 2209195700, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
+    mapper_3: (0x32DB40 * 3 as usize, 2221445495, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
     mapper_4_no_chrom: (0x30213C * 3 as usize, 3944012330, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")),
     mapper_4_p128k_cr8k: (0x277EF7 * 3 as usize, 1769737631, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR8K.nes")),
-     // TODO - Unconvinced, this claims 8KB CR but surely based on name it's 32KB, maybe I don't support higher than 8KB RAM on an MMC3 board?
+    // TODO - Below is likely wrong, we don't have 32KB CHR RAM in the screenshot
     mapper_4_p128k_cr32k: (0x28DBF4 * 3 as usize, 1769737631, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR32K.nes")),
     mapper_4_p256k_c256k: (0xC3B1E * 3 as usize, 502837231, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M4_P256K_C256K.nes")),
     mapper_7_p128k: (0x262201 * 3 as usize, 2603256516, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M7_P128K.nes")),
     mapper_7_p128k_cr8k: (0x262201 * 3 as usize, 423779697, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M7_P128K_CR8K.nes")),
     mapper_9_p128k_c64k: (0x4F5DD * 3 as usize, 3084268463, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M9_P128K_C64K.nes")),
     mapper_10_p128k_c64k_s8k: (0x1C9707 * 3 as usize, 2938351879, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M10_P128K_C64K_S8K.nes")),
-    mapper_10_p128k_c64k_s8k: (0x10521E * 3 as usize, 2938351879, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M10_P128K_C64K_W8K.nes")),
+    mapper_10_p128k_c64k_w8k: (0x10521E * 3 as usize, 2938351879, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M10_P128K_C64K_W8K.nes")),
     mapper_11_p64k_c64k_v: (0x113AC6 * 3 as usize, 2383587170, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M11_P64K_C64K_V.nes")),
     // TODO - Below renders as BNROM in holy mapperel instead of color dreams because I don't bank CHRRAM
     // mapper_11_p64k_c64k_v: (0x113AC6 * 3 as usize, 2383587170, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M11_P64K_CR32K_V.nes")),
     mapper_34_p128k_h: (0x38C38A * 3 as usize, 3229261591, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M34_P128K_H.nes")),
     mapper_34_p128k_cr8k_h: (0x2A38FA * 3 as usize, 1108494498, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M34_P128K_CR8K_H.nes")),
-    mapper_66_p64k_c16k_v: (0x2A38FA * 3 as usize, 1108494498, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M66_P64K_C16K_V.nes")),
-    mapper_180_p128k_cr8k_h: (0x2A38FA * 3 as usize, 1108494498, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M180_P128K_CR8K_H.nes")),
+    mapper_66_p64k_c16k_v: (0x19DD0C * 3 as usize, 2221445495, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M66_P64K_C16K_V.nes")),
+    mapper_180_p128k_cr8k_h: (0x2A38FA * 3 as usize, 3038721105, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M180_P128K_CR8K_H.nes")),
     mapper_180_p128k_h: (0x2B95F7 * 3 as usize, 930604004, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M180_P128K_H.nes")),
 
     // ----- MMC3 IRQ Tests -----

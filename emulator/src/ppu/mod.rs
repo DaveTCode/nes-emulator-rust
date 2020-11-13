@@ -344,7 +344,7 @@ impl Ppu {
             0x2001 => self.last_written_byte,
             // PPUSTATUS
             0x2002 => {
-                info!(
+                debug!(
                     "PPUSTATUS read on scanline {}, dot {}",
                     self.scanline_state.scanline, self.scanline_state.dot
                 );
@@ -620,21 +620,7 @@ impl Iterator for Ppu {
 
         match self.scanline_state.scanline {
             0..=239 | 261 => {
-                if self.scanline_state.scanline != 261 && self.scanline_state.dot >= 1 && self.scanline_state.dot <= 256
-                {
-                    self.draw_pixel(self.scanline_state.scanline, self.scanline_state.dot);
-                }
-
                 if self.ppu_mask.is_rendering_enabled() {
-                    self.fetch_data(self.scanline_state.dot);
-
-                    self.process_sprite_cycle(
-                        self.scanline_state.scanline,
-                        self.scanline_state.dot,
-                        self.ppu_ctrl.sprite_size.pixels(),
-                        self.ppu_ctrl.sprite_tile_table_select,
-                    );
-
                     // Background registers shift on dots 2-256 322-337 inclusive EXCEPT on pre-render where they only shift during 322-337
                     if (self.scanline_state.dot >= 2
                         && self.scanline_state.dot <= 256
@@ -644,9 +630,23 @@ impl Iterator for Ppu {
                         self.scanline_state.shift_bg_registers();
                     }
 
+                    self.fetch_data(self.scanline_state.dot);
+
+                    self.process_sprite_cycle(
+                        self.scanline_state.scanline,
+                        self.scanline_state.dot,
+                        self.ppu_ctrl.sprite_size.pixels(),
+                        self.ppu_ctrl.sprite_tile_table_select,
+                    );
+
                     if self.scanline_state.scanline == 261 && self.scanline_state.dot == 339 && self.is_short_frame {
                         trigger_cycle_skip = true;
                     }
+                }
+
+                if self.scanline_state.scanline != 261 && self.scanline_state.dot >= 1 && self.scanline_state.dot <= 256
+                {
+                    self.draw_pixel(self.scanline_state.scanline, self.scanline_state.dot);
                 }
 
                 if self.scanline_state.scanline == 261 {

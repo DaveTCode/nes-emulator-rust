@@ -1,4 +1,4 @@
-use cartridge::mappers::{ChrBaseData, ChrData, NoBankChrChip, PrgBaseData};
+use cartridge::mappers::{ChrBaseData, ChrData, PrgBaseData};
 use cartridge::mirroring::MirroringMode;
 use cartridge::CartridgeHeader;
 use cartridge::CpuCartridgeAddressBus;

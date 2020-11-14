@@ -153,6 +153,7 @@ impl InternalRegisters {
 
 pub struct Ppu {
     pub(crate) total_cycles: PpuCycle,
+    frame_number: u32,
     scanline_state: ScanlineState,
     sprite_data: SpriteData,
     palette_ram: PaletteRam,
@@ -163,7 +164,6 @@ pub struct Ppu {
     internal_registers: InternalRegisters,
     ppu_data_buffer: u8,   // Internal buffer returned on PPUDATA reads
     last_written_byte: u8, // Stores the value last written onto the latch - TODO implement decay over time
-    is_short_frame: bool,  // Every other frame the pre-render scanline takes one fewer cycle
     nmi_interrupt: Option<Interrupt>,
     pub(crate) frame_buffer: [u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
     priorities: [u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
@@ -174,6 +174,7 @@ impl Ppu {
     pub fn new(chr_address_bus: Box<dyn PpuCartridgeAddressBus>) -> Self {
         Ppu {
             total_cycles: 27,
+            frame_number: 1,
             scanline_state: ScanlineState {
                 scanline: 0,
                 nametable_byte: 0,
@@ -203,7 +204,6 @@ impl Ppu {
             },
             last_written_byte: 0x0,
             ppu_data_buffer: 0x0,
-            is_short_frame: false,
             nmi_interrupt: None,
             frame_buffer: [0; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
             priorities: [0; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
@@ -433,9 +433,8 @@ impl Ppu {
         if cycle == 0 {
             // On a short frame we skip the last dot of the pre-render line, so we need to load the
             // nametable byte here instead.
-            // Note that this is "not short frame" because that's already been reset by this point
-            // Otherwise cycle 0 is always a blank cycle with no fetches
-            if !self.is_short_frame && self.ppu_mask.is_rendering_enabled() {
+            // Note that this is even frames because that's already been incremented by this point
+            if self.frame_number & 1 == 0 && self.ppu_mask.is_rendering_enabled() {
                 self.scanline_state.nametable_byte =
                     self.read_byte(0x2000 | (self.internal_registers.vram_addr & 0x0FFF));
             }
@@ -614,10 +613,6 @@ impl Iterator for Ppu {
     fn next(&mut self) -> Option<Self::Item> {
         let mut trigger_cycle_skip = false;
 
-        if self.scanline_state.scanline == 0 && self.scanline_state.dot == 0 {
-            self.is_short_frame = !self.is_short_frame;
-        }
-
         match self.scanline_state.scanline {
             0..=239 | 261 => {
                 if self.ppu_mask.is_rendering_enabled() {
@@ -639,7 +634,10 @@ impl Iterator for Ppu {
                         self.ppu_ctrl.sprite_tile_table_select,
                     );
 
-                    if self.scanline_state.scanline == 261 && self.scanline_state.dot == 339 && self.is_short_frame {
+                    if self.scanline_state.scanline == 261
+                        && self.scanline_state.dot == 339
+                        && self.frame_number & 1 == 1
+                    {
                         trigger_cycle_skip = true;
                     }
                 }
@@ -676,6 +674,13 @@ impl Iterator for Ppu {
         self.scanline_state.next_cycle();
         if trigger_cycle_skip && self.ppu_mask.is_rendering_enabled() {
             self.scanline_state.next_cycle()
+        }
+
+        // Check for rendering enabled update (delayed by one cycle from write)
+        self.ppu_mask.update_rendering_enabled();
+
+        if self.scanline_state.dot == 0 && self.scanline_state.scanline == 0 {
+            self.frame_number += 1;
         }
 
         // Track total PPU cycles for components which need to know. Bit sketchy here that it wraps

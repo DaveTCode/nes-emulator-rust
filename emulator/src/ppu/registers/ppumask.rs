@@ -8,6 +8,7 @@ pub(crate) struct PpuMask {
     pub(crate) emphasize_red: bool,
     pub(crate) emphasize_green: bool,
     pub(crate) emphasize_blue: bool,
+    rendering_enabled: bool,
 }
 
 impl PpuMask {
@@ -21,6 +22,7 @@ impl PpuMask {
             emphasize_red: false,
             emphasize_green: false,
             emphasize_blue: false,
+            rendering_enabled: false,
         }
     }
 
@@ -35,7 +37,11 @@ impl PpuMask {
         self.emphasize_blue = value & 0b1000_0000 == 0b1000_0000;
     }
 
+    pub(crate) fn update_rendering_enabled(&mut self) {
+        self.rendering_enabled = self.show_background || self.show_sprites;
+    }
+
     pub(crate) fn is_rendering_enabled(&self) -> bool {
-        self.show_background || self.show_sprites
+        self.rendering_enabled
     }
 }

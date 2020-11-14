@@ -402,7 +402,7 @@ impl Ppu {
                 self.chr_address_bus.read_byte(address, self.total_cycles)
             }
             0x3F00..=0x3FFF => self.palette_ram.read_byte(address),
-            _ => panic!("Invalid address for PPU {:04X}", address),
+            _ => 0x0,
         }
     }
 
@@ -423,7 +423,7 @@ impl Ppu {
             0x3F00..=0x3FFF => {
                 self.palette_ram.write_byte(address, value);
             }
-            _ => panic!("Invalid address for PPU write {:04X}={:02X}", address, value),
+            _ => (),
         }
     }
 

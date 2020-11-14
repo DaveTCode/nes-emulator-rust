@@ -102,7 +102,7 @@ rom_tests! {
     mapper_1_p128k_c128k_w8k: (0x3C6627 * 3 as usize, 2354549445, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M1_P128K_C128K_W8K.nes")),
     mapper_2_p128k_cr8k_v: (0x253959 * 3 as usize, 1058817094, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M2_P128K_CR8K_V.nes")),
     mapper_2_p128k_v: (0x24C505 * 3 as usize, 3178533875, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M2_P128K_V.nes")),
-    mapper_3: (0x32DB40 * 3 as usize, 2221445495, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
+    mapper_3: (0x2A38FA * 3 as usize, 2606110735, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M3_P32K_C32K_H.nes")),
     mapper_4_no_chrom: (0x30213C * 3 as usize, 3944012330, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M4_P128K.nes")),
     mapper_4_p128k_cr8k: (0x277EF7 * 3 as usize, 1769737631, Path::new("..").join("roms").join("test").join("holy_mapperel").join("M4_P128K_CR8K.nes")),
     // TODO - Below is likely wrong, we don't have 32KB CHR RAM in the screenshot

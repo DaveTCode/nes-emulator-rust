@@ -1095,6 +1095,9 @@ impl<'a> Iterator for Cpu<'a> {
     type Item = ();
 
     fn next(&mut self) -> Option<Self::Item> {
+        // Always clock the PPU
+        self.ppu.next();
+
         // Check if we need to clock the CPU
         self.cpu_cycle_counter -= 1;
         if self.cpu_cycle_counter == 0 {
@@ -1104,9 +1107,6 @@ impl<'a> Iterator for Cpu<'a> {
             // Clock the APU once every CPU cycle, it decides internally which things to clock at what speed
             self.apu.next();
         }
-
-        // Always clock the PPU
-        self.ppu.next();
 
         // Does the cpu ever halt? If no return None, otherwise this is just an
         // infinite sequence. Maybe bad opcode? Undefined behaviour of some sort?

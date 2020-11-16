@@ -1,3 +1,4 @@
+use apu::envelope::Envelope;
 use apu::length_counter::LengthCounter;
 use log::{debug, info};
 
@@ -29,25 +30,6 @@ impl SweepUnit {
         self.divider_period = (value & 0b0111_0000) >> 4;
         self.is_negate = value & 0b0000_1000 == 0b0000_1000;
         self.shift_count = value & 0b0000_0111;
-    }
-}
-
-#[derive(Debug)]
-struct Envelope {
-    constant_volume: u8,
-    use_envelope: bool,
-    envelope_value: u8,
-    start_flag: bool,
-}
-
-impl Envelope {
-    fn new() -> Self {
-        Envelope {
-            constant_volume: 0,
-            use_envelope: false,
-            envelope_value: 0,
-            start_flag: false,
-        }
     }
 }
 
@@ -96,8 +78,7 @@ impl PulseChannel {
             _ => panic!(),
         };
         self.length_counter.set_halt(value & 0b0010_0000 != 0);
-        self.envelope.use_envelope = value & 0b0001_0000 != 0;
-        self.envelope.constant_volume = value & 0b1111;
+        self.envelope.register_write(value);
     }
 
     /// Corresponds to writes to 0x4002 (pulse 1) & 0x4006 (pulse 2)
@@ -118,7 +99,7 @@ impl PulseChannel {
         self.timer_load = (self.timer_load & 0b1111_1111) | ((value as u16 & 0b111) << 8);
         self.timer = self.timer_load;
         self.sequence = 0;
-        // TODO - Restart envelope
+        self.envelope.set_start_flag();
     }
 
     /// Corresponds to writes to 0x4001 (pulse 1) & 0x4005 (pulse 2)
@@ -141,12 +122,7 @@ impl PulseChannel {
     }
 
     pub(super) fn clock_envelope(&mut self) {
-        if self.envelope.start_flag {
-            self.envelope.start_flag = false;
-        // TODO - Other things that happen when clearing start flag
-        } else {
-            // TODO
-        }
+        self.envelope.clock();
     }
 
     /// Called once per APU clock (once every two CPU clocks) and steps the timer
@@ -163,5 +139,9 @@ impl PulseChannel {
         } else {
             self.timer -= 1;
         }
+    }
+
+    pub(super) fn mixer_value(&self) -> u8 {
+        self.envelope.volume()
     }
 }

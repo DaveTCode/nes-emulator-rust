@@ -5,6 +5,7 @@ use apu::triangle_channel::TriangleChannel;
 use log::info;
 
 mod dmc_channel;
+mod envelope;
 mod length_counter;
 mod noise_channel;
 mod pulse_channel;
@@ -183,7 +184,7 @@ impl Apu {
         info!("Running quarter frame update: apu_cycles={}", self.total_apu_cycles);
         self.pulse_channel_1.clock_envelope();
         self.pulse_channel_2.clock_envelope();
-        // TODO - Update envelopes on other channels
+        self.noise_channel.clock_envelope();
         self.triangle_channel.clock_linear_counter();
     }
 

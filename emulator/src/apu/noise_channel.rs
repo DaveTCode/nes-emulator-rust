@@ -1,3 +1,4 @@
+use apu::envelope::Envelope;
 use apu::length_counter::LengthCounter;
 use log::{debug, info};
 
@@ -13,6 +14,7 @@ pub(super) struct NoiseChannel {
     timer: u16,
     /// 15 bit wide shift register for the LSFR
     shift_register: u16,
+    envelope: Envelope,
 }
 
 impl NoiseChannel {
@@ -24,6 +26,7 @@ impl NoiseChannel {
             period: 0,
             timer: 0,
             shift_register: 1,
+            envelope: Envelope::new(),
         }
     }
 
@@ -37,7 +40,7 @@ impl NoiseChannel {
     /// Corresponds to writes to 0x400C
     pub(super) fn write_length_halt_envelope_register(&mut self, value: u8) {
         self.length_counter.set_halt(value & 0b0010_0000 != 0);
-        // TODO - Envelope and constant volume flags
+        self.envelope.register_write(value);
     }
 
     /// Corresponds to write to 400E
@@ -55,6 +58,7 @@ impl NoiseChannel {
                 value, self.length_counter
             );
         }
+        self.envelope.set_start_flag();
     }
 
     pub(crate) fn non_zero_length_counter(&self) -> bool {
@@ -64,6 +68,10 @@ impl NoiseChannel {
     pub(super) fn clock_length_counter(&mut self) {
         info!("Clocking length counter for triangle channel {:?}", self.length_counter);
         self.length_counter.clock();
+    }
+
+    pub(super) fn clock_envelope(&mut self) {
+        self.envelope.clock();
     }
 
     /// Noise channel is clocked on every APU cycle
@@ -90,7 +98,7 @@ impl NoiseChannel {
     /// The output volume for the channel
     pub(super) fn mixer_value(&self) -> u8 {
         if self.length_counter.is_non_zero() && self.shift_register & 0b1 == 0 {
-            0 // TODO - This should be the envelope/constant volume
+            self.envelope.volume()
         } else {
             0
         }

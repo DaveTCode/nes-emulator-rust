@@ -442,13 +442,13 @@ fn get_sprite_address(
         false => scanline.saturating_sub(y),
     };
 
-    if (scanline.saturating_sub(y)) > 7 {
+    if fine_y > 7 {
         fine_y += 8;
     }
 
     let top_tile_byte = match sprite_height {
         8 => tile as u16 * 16 + pattern_table_base,
-        16 => ((tile as u16) & 0b1111_1110) * 16 + ((tile as u16 & 1) * 0x1000),
+        16 => (((tile as u16) & 0b1111_1110) << 4) + ((tile as u16 & 1) * 0x1000),
         _ => panic!("Wrong sprite height {:}", sprite_height),
     };
 

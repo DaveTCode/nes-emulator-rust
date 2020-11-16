@@ -411,13 +411,13 @@ impl super::Ppu {
                 };
 
                 match (sprite_index, is_high_byte) {
-                    (7, _) => SpriteFetch::Completed,
                     (_, false) => SpriteFetch::FetchByte {
                         sprite_index,
                         y,
                         tile,
                         is_high_byte: true,
                     },
+                    (7, _) => SpriteFetch::Completed,
                     (_, true) => SpriteFetch::ReadY {
                         sprite_index: sprite_index + 1,
                     },

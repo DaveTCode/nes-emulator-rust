@@ -47,19 +47,24 @@ pub(crate) fn run(
     let mut cpu = Cpu::new(prg_address_bus, &mut apu, &mut io, &mut ppu);
     let mut time_of_last_render = time::Instant::now();
     let frame_duration = time::Duration::from_millis(17);
+    let mut is_paused = false;
 
     'main: loop {
-        cpu.next();
+        if !is_paused {
+            cpu.next();
+        }
 
         // Optionally re-render & poll for events this frame
-        if cpu.is_frame_complete_cycle() {
+        if cpu.is_frame_complete_cycle() || is_paused {
             info!("Frame complete, polling for events and rendering");
 
-            let framebuffer = cpu.get_framebuffer();
-            texture.update(None, framebuffer, screen_width as usize * 4).unwrap();
-            canvas.clear();
-            canvas.copy(&texture, None, None).unwrap();
-            canvas.present();
+            if !is_paused {
+                let framebuffer = cpu.get_framebuffer();
+                texture.update(None, framebuffer, screen_width as usize * 4).unwrap();
+                canvas.clear();
+                canvas.copy(&texture, None, None).unwrap();
+                canvas.present();
+            }
 
             for event in event_pump.poll_iter() {
                 info!("{:?}", event);
@@ -83,6 +88,7 @@ pub(crate) fn run(
                         Keycode::Right => cpu.button_down(Controller::One, Button::Right),
                         Keycode::Up => cpu.button_down(Controller::One, Button::Up),
                         Keycode::Down => cpu.button_down(Controller::One, Button::Down),
+                        Keycode::Space => is_paused = !is_paused,
                         Keycode::T => {
                             let framebuffer = cpu.get_framebuffer();
                             let cycles = cpu.cycles;

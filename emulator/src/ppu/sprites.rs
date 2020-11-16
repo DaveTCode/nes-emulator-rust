@@ -515,7 +515,7 @@ mod sprite_tests {
 
             for fine_y in 0..16 {
                 let not_flipped_fine_y = fine_y + if fine_y > 7 { 8 } else { 0 };
-                let flipped_fine_y = (15 - fine_y) + if fine_y > 7 { 8 } else { 0 };
+                let flipped_fine_y = (15 - fine_y) + if (15 - fine_y) > 7 { 8 } else { 0 };
 
                 // Check that the low byte of the tile has the right byte
                 assert_eq!(

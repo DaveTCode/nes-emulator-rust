@@ -1,6 +1,6 @@
 use apu::envelope::Envelope;
 use apu::length_counter::LengthCounter;
-use log::{debug, info};
+use log::{debug, error, info};
 
 const TIMER_PERIOD_TABLE: [u16; 16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
@@ -80,9 +80,9 @@ impl NoiseChannel {
             self.timer = self.period;
 
             // Step the LSFR
-            debug!("Updating LSFR {:b}", self.shift_register);
+            error!("Updating LSFR {:015b}", self.shift_register);
             let feedback = self.shift_register & 0b1
-                | if self.lsfr_use_bit_6 {
+                ^ if self.lsfr_use_bit_6 {
                     (self.shift_register & 0b0100_0000) >> 6
                 } else {
                     (self.shift_register & 0b10) >> 1

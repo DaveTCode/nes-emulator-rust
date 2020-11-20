@@ -85,4 +85,9 @@ impl DmcChannel {
     pub(super) fn clock_timer(&mut self) {
         // TODO
     }
+
+    pub(super) fn mixer_value(&self) -> u8 {
+        // TODO
+        0
+    }
 }

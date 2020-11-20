@@ -14,9 +14,9 @@ use io::Button;
 use io::Controller;
 use io::Io;
 use log::{debug, info};
-use ppu::Ppu;
 use ppu::SCREEN_HEIGHT;
 use ppu::SCREEN_WIDTH;
+use ppu::{Ppu, PpuIteratorState};
 
 #[derive(Debug, Copy, Clone)]
 enum State {
@@ -1078,10 +1078,6 @@ impl<'a> Cpu<'a> {
         self.io.button_up(controller, button);
     }
 
-    pub fn is_frame_complete_cycle(&self) -> bool {
-        self.ppu.output_cycle()
-    }
-
     pub fn get_framebuffer(&self) -> &[u8; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize] {
         &self.ppu.frame_buffer
     }
@@ -1092,11 +1088,12 @@ impl<'a> Cpu<'a> {
 }
 
 impl<'a> Iterator for Cpu<'a> {
-    type Item = ();
+    type Item = (Option<PpuIteratorState>, Option<f32>);
 
     fn next(&mut self) -> Option<Self::Item> {
         // Always clock the PPU
-        self.ppu.next();
+        let ppu_state = self.ppu.next();
+        let mut sample: Option<f32> = None;
 
         // Check if we need to clock the CPU
         self.cpu_cycle_counter -= 1;
@@ -1105,11 +1102,11 @@ impl<'a> Iterator for Cpu<'a> {
             self.clock();
 
             // Clock the APU once every CPU cycle, it decides internally which things to clock at what speed
-            self.apu.next();
+            sample = self.apu.next();
         }
 
         // Does the cpu ever halt? If no return None, otherwise this is just an
         // infinite sequence. Maybe bad opcode? Undefined behaviour of some sort?
-        None
+        Some((ppu_state, sample))
     }
 }

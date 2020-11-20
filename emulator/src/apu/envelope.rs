@@ -1,3 +1,5 @@
+use log::info;
+
 #[derive(Debug)]
 pub(super) struct Envelope {
     constant_volume: u8,
@@ -44,6 +46,8 @@ impl Envelope {
         self.loop_envelope = value & 0b0010_0000 != 0;
         self.use_envelope = value & 0b0001_0000 != 0;
         self.constant_volume = value & 0b1111;
+
+        info!("Envelope updated {:?}", &self);
     }
 
     /// Used on writes from 4003 | 4007 | 400F

@@ -74,6 +74,12 @@ pub struct Io {
     strobe_register: bool,
 }
 
+impl Default for Io {
+    fn default() -> Self {
+        Io::new()
+    }
+}
+
 impl Io {
     pub fn new() -> Self {
         Io {

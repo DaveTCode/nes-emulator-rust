@@ -97,7 +97,10 @@ impl PulseChannel {
             );
         }
         self.timer_load = (self.timer_load & 0b1111_1111) | ((value as u16 & 0b111) << 8);
-        self.timer = self.timer_load;
+        info!(
+            "Loaded timer with {}, restarting envelope and duty sequence",
+            self.timer_load
+        );
         self.sequence = 0;
         self.envelope.set_start_flag();
     }
@@ -142,6 +145,10 @@ impl PulseChannel {
     }
 
     pub(super) fn mixer_value(&self) -> u8 {
-        self.envelope.volume()
+        if self.duty_cycle[self.sequence] != 0 && self.length_counter.is_non_zero() && self.timer >= 8 {
+            self.envelope.volume()
+        } else {
+            0
+        }
     }
 }

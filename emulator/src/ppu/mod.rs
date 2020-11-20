@@ -248,12 +248,6 @@ impl Ppu {
         self.scanline_state.dot
     }
 
-    /// Return whether or not we're in the cycle immediately after rendering
-    /// visible lines is complete
-    pub(crate) fn output_cycle(&self) -> bool {
-        self.scanline_state.scanline == 240 && self.scanline_state.dot == 0
-    }
-
     /// Writes to the various PPU registers mapped into the CPU address space.
     pub(crate) fn write_register(&mut self, address: u16, value: u8) {
         // TODO - Handle writes during rendering being off
@@ -607,8 +601,13 @@ impl Ppu {
     }
 }
 
+pub enum PpuIteratorState {
+    NormalCycle,
+    ReadyToRender,
+}
+
 impl Iterator for Ppu {
-    type Item = ();
+    type Item = PpuIteratorState;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut trigger_cycle_skip = false;
@@ -679,14 +678,20 @@ impl Iterator for Ppu {
         // Check for rendering enabled update (delayed by one cycle from write)
         self.ppu_mask.update_rendering_enabled();
 
+        // Track total PPU cycles for components which need to know. Bit sketchy here that it wraps
+        self.total_cycles = self.total_cycles.wrapping_add(1);
+
+        // Track current frame number, partially for debugging and partially to
+        // tell whether even or odd frame
         if self.scanline_state.dot == 0 && self.scanline_state.scanline == 0 {
             self.frame_number += 1;
         }
 
-        // Track total PPU cycles for components which need to know. Bit sketchy here that it wraps
-        self.total_cycles = self.total_cycles.wrapping_add(1);
-
-        None // PPU never exits by itself
+        if self.scanline_state.scanline == 241 && self.scanline_state.dot == 0 {
+            Some(PpuIteratorState::ReadyToRender)
+        } else {
+            Some(PpuIteratorState::NormalCycle)
+        }
     }
 }
 

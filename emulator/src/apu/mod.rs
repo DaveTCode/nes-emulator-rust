@@ -7,6 +7,7 @@ use log::info;
 mod dmc_channel;
 mod envelope;
 mod length_counter;
+mod mixer;
 mod noise_channel;
 mod pulse_channel;
 mod triangle_channel;
@@ -62,6 +63,12 @@ pub struct Apu {
     total_apu_cycles: ApuCycle,
     is_apu_cycle: bool,
     interrupt_triggered_cycles: Option<ApuCycle>,
+}
+
+impl Default for Apu {
+    fn default() -> Self {
+        Apu::new()
+    }
 }
 
 impl Apu {
@@ -199,10 +206,20 @@ impl Apu {
         self.pulse_channel_1.clock_sweep_unit();
         self.pulse_channel_2.clock_sweep_unit();
     }
+
+    fn get_current_output_byte(&self) -> f32 {
+        mixer::mixer_value(
+            self.pulse_channel_1.mixer_value(),
+            self.pulse_channel_2.mixer_value(),
+            self.triangle_channel.mixer_value(),
+            self.noise_channel.mixer_value(),
+            self.dmc_channel.mixer_value(),
+        )
+    }
 }
 
 impl Iterator for Apu {
-    type Item = ();
+    type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.frame_counter.timer_reset_countdown > 0 {
@@ -247,7 +264,8 @@ impl Iterator for Apu {
         // Every other cycle is an APU cycle (as clocked by the CPU)
         self.is_apu_cycle = !self.is_apu_cycle;
 
-        // Apu never stops clocking
-        None
+        // Output the currently emitted byte, up to calling code to down sample to a sensible rate
+        // I think it's correct that we output a byte every cpu cycle rather than every APU cycle
+        Some(self.get_current_output_byte())
     }
 }

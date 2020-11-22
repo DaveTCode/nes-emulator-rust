@@ -80,7 +80,7 @@ impl NoiseChannel {
             self.timer = self.period;
 
             // Step the LSFR
-            error!("Updating LSFR {:015b}", self.shift_register);
+            debug!("Updating LSFR {:015b}", self.shift_register);
             let feedback = self.shift_register & 0b1
                 ^ if self.lsfr_use_bit_6 {
                     (self.shift_register & 0b0100_0000) >> 6

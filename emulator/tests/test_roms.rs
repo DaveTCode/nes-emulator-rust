@@ -116,7 +116,7 @@ rom_tests! {
     // ----- MMC3 IRQ Tests -----
     mmc3_irq_clocking: (0x105218 * 3 as usize, 4185058565, Path::new("..").join("roms").join("test").join("mmc3_test").join("rom_singles").join("1-clocking.nes")),
     mmc3_irq_details: (0x113AC1 * 3 as usize, 1296344911, Path::new("..").join("roms").join("test").join("mmc3_test").join("rom_singles").join("2-details.nes")),
-    //mmc3_irq_a12_clocking: (0x105218 * 3 as usize, 820133214, Path::new("..").join("roms").join("test").join("mmc3_test").join("rom_singles").join("3-A12_clocking.nes")),
+    mmc3_irq_a12_clocking: (0x113B3A * 3 as usize, 820133214, Path::new("..").join("roms").join("test").join("mmc3_test").join("rom_singles").join("3-A12_clocking.nes")),
     //mmc3_irq_scanline_timing: (0x90CD6 * 3 as usize, 3691845950, Path::new("..").join("roms").join("test").join("mmc3_test").join("rom_singles").join("4-scanline_timing.nes")), // Failed #14 - IRQ never occurred
     mmc3_irq_mmc3: (0x163A62 * 3 as usize, 144123581, Path::new("..").join("roms").join("test").join("mmc3_test").join("rom_singles").join("5-MMC3.nes")),
     //mmc3_irq_mmc3_alt: (0x90CD6 * 3 as usize, 3691845950, Path::new("..").join("roms").join("test").join("mmc3_test").join("rom_singles").join("6-MMC3_alt.nes")), // Failed #2 - Don't think I support the MMC3 alternate board

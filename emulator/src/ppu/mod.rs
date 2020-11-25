@@ -322,6 +322,8 @@ impl Ppu {
                 self.write_byte(self.internal_registers.vram_addr, value);
                 self.internal_registers
                     .increment_vram_addr(&self.ppu_ctrl.increment_mode);
+                self.chr_address_bus
+                    .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
             }
             _ => panic!("Write to {:04X} not valid for PPU ({:02X})", address, value),
         }
@@ -364,6 +366,7 @@ impl Ppu {
             0x2005 => self.last_written_byte,
             0x2006 => self.last_written_byte,
             0x2007 => {
+                // PPUDATA
                 let mut value = self.ppu_data_buffer;
                 self.ppu_data_buffer = match self.internal_registers.vram_addr {
                     0x0000..=0x3EFF => self.read_byte(self.internal_registers.vram_addr),
@@ -375,6 +378,8 @@ impl Ppu {
                 };
                 self.internal_registers
                     .increment_vram_addr(&self.ppu_ctrl.increment_mode);
+                self.chr_address_bus
+                    .update_vram_address(self.internal_registers.vram_addr, self.total_cycles);
                 value
             }
             _ => panic!("Read from {:04X} not valid for PPU", address),
@@ -391,10 +396,7 @@ impl Ppu {
         //debug!("PPU address space read {:04X}", address);
 
         match address {
-            0x0000..=0x3EFF => {
-                self.chr_address_bus.update_vram_address(address, self.total_cycles);
-                self.chr_address_bus.read_byte(address, self.total_cycles)
-            }
+            0x0000..=0x3EFF => self.chr_address_bus.read_byte(address, self.total_cycles),
             0x3F00..=0x3FFF => self.palette_ram.read_byte(address),
             _ => 0x0,
         }
@@ -411,7 +413,6 @@ impl Ppu {
 
         match address {
             0x0000..=0x3EFF => {
-                self.chr_address_bus.update_vram_address(address, self.total_cycles);
                 self.chr_address_bus.write_byte(address, value, self.total_cycles);
             }
             0x3F00..=0x3FFF => {
@@ -495,6 +496,8 @@ impl Ppu {
                     self.internal_registers.next_address = self.ppu_ctrl.background_tile_table_select
                         + tile_index
                         + self.internal_registers.fine_y() as u16;
+                    self.chr_address_bus
+                        .update_vram_address(self.internal_registers.next_address, self.total_cycles);
                 }
             }
             6 => {
@@ -509,6 +512,8 @@ impl Ppu {
                         + tile_index
                         + self.internal_registers.fine_y() as u16
                         + 8;
+                    self.chr_address_bus
+                        .update_vram_address(self.internal_registers.next_address, self.total_cycles);
                 }
             }
             _ => panic!("Coding error, cycle {:}", cycle),

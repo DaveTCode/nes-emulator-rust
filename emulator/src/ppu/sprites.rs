@@ -366,7 +366,7 @@ impl super::Ppu {
                 tile,
                 is_high_byte,
             } => {
-                let mut value = self.read_byte(get_sprite_address(
+                let address = get_sprite_address(
                     y as u16,
                     tile,
                     self.sprite_data.sprites[sprite_index].attribute_latch.flipped_vertical,
@@ -374,7 +374,9 @@ impl super::Ppu {
                     scanline,
                     pattern_table_base,
                     is_high_byte,
-                ));
+                );
+                self.chr_address_bus.update_vram_address(address, self.total_cycles);
+                let mut value = self.read_byte(address);
 
                 if scanline >= y as u16 && scanline < y as u16 + sprite_height as u16 {
                     self.sprite_data.sprites[sprite_index].visible = true;

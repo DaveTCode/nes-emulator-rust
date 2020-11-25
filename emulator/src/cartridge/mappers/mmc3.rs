@@ -205,9 +205,9 @@ impl MMC3ChrChip {
     }
 
     fn clock_irq_counter(&mut self) {
-        info!("Clocking IRQ counter {:02X}", self.irq_counter);
+        debug!("Clocking IRQ counter {:02X}", self.irq_counter);
         if self.reload_irq_next_rising_edge || self.irq_counter == 0 {
-            info!(
+            debug!(
                 "MMC3 - Reloading IRQ counter (current {:02X}) {:02X}",
                 self.irq_counter, self.irq_latch
             );

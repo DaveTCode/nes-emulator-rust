@@ -502,9 +502,9 @@ checksum = "a94d21414c1f4a51209ad204c1776a3d0765002c76c6abcb602a6f09f1e881c7"
 
 [[package]]
 name = "log4rs"
-version = "1.0.0-alpha-2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4ef3924aecebbf98eff7cfc62c46b4b7eb119b29f9b820d68654040a0292c5a"
+checksum = "d1572a880d1115ff867396eee7ae2bc924554225e67a0d3c85c745b3e60ca211"
 dependencies = [
  "anyhow",
  "arc-swap",

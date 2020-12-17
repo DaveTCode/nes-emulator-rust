@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 bitflags = "1.2.1"
 log = "0.4.11"
-log4rs = "1.0.0-alpha-2"
+log4rs = "1.0.0"
 zip = "0.5.9"
 
 [dev-dependencies]

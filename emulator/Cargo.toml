@@ -10,7 +10,7 @@ publish = false
 bitflags = "1.2.1"
 log = "0.4.14"
 log4rs = "1.0.0"
-zip = "0.5.11"
+zip = "0.5.12"
 
 [dev-dependencies]
 crc32fast = "1.2.1"

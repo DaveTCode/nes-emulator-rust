@@ -10,7 +10,7 @@ crc32fast = "1.2.1"
 log = "0.4.14"
 log4rs = "1.0.0"
 rust_nes = { path = "../emulator" }
-sdl2 = { version = "0.35.0", features = ["bundled", "static-link"] }
+sdl2 = { version = "0.35.1", features = ["bundled", "static-link"] }
 
 [[bin]]
 name = "nes-emulator"

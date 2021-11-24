@@ -6,7 +6,7 @@ default-run = "nes-emulator"
 
 [dependencies]
 clap = "3.0.0-beta.5"
-crc32fast = "1.2.1"
+crc32fast = "1.2.2"
 log = "0.4.14"
 log4rs = "1.0.0"
 rust_nes = { path = "../emulator" }

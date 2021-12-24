@@ -148,9 +148,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.0.0-rc.5"
+version = "3.0.0-rc.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d358d5dcd274692e60df775bd452f66341a49ab90cc6cc1084c4350a3f914d9"
+checksum = "484f17839417b695a6f4a75c20e49820ba0a1d00aa41ebd8ba0e5dfe0fbc3b74"
 dependencies = [
  "atty",
  "bitflags",
@@ -508,7 +508,7 @@ dependencies = [
 name = "nes_rom_db"
 version = "0.0.1"
 dependencies = [
- "clap 3.0.0-rc.5",
+ "clap 3.0.0-rc.8",
  "csv",
  "rust_nes",
  "serde",
@@ -773,7 +773,7 @@ dependencies = [
 name = "sdl2_frontend"
 version = "0.1.0"
 dependencies = [
- "clap 3.0.0-rc.5",
+ "clap 3.0.0-rc.8",
  "crc32fast",
  "log",
  "log4rs",
@@ -884,9 +884,9 @@ dependencies = [
 
 [[package]]
 name = "termcolor"
-version = "1.1.0"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb6bfa289a4d7c5766392812c0a1f4c1ba45afa1ad47803c11e1f407d846d75f"
+checksum = "2dfed899f0eb03f32ee8c6a0aabdb8a7949659e3466561fc0adf54e26d88c5f4"
 dependencies = [
  "winapi-util",
 ]

@@ -1,4 +1,5 @@
-[![Build Status](https://dev.azure.com/DavidATyler/Nes%20Emulator/_apis/build/status/DaveTCode.nes-emulator-rust?branchName=master)](https://dev.azure.com/DavidATyler/Nes%20Emulator/_build/latest?definitionId=5&branchName=master)
+![Build Status](https://github.com/davetcode/nes-emulator-rust/actions/workflows/build/badge.svg)
+
 
 # Rust Nes Emulator
 

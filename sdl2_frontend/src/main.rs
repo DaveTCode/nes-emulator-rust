@@ -7,10 +7,10 @@ extern crate log4rs;
 extern crate rust_nes;
 extern crate sdl2;
 
-use clap::Clap;
+use clap::Parser;
 use log::info;
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
 #[clap(version = "1.0", author = "David Tyler <davet.code@gmail.com>")]
 struct Opts {
     rom_file: String,

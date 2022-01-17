@@ -2,12 +2,12 @@ extern crate clap;
 extern crate rust_nes;
 extern crate serde;
 
-use clap::Clap;
+use clap::Parser;
 use serde::Serialize;
 use std::fs;
 use std::io;
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
 #[clap(version = "1.0", author = "David Tyler <davet.code@gmail.com>")]
 struct Opts {
     rom_directory: String,

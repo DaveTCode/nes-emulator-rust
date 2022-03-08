@@ -150,9 +150,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.5"
+version = "3.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ced1892c55c910c1219e98d6fc8d71f6bddba7905866ce740066d8bfea859312"
+checksum = "d8c93436c21e4698bacadf42917db28b23017027a4deccb35dbe47a7e7840123"
 dependencies = [
  "atty",
  "bitflags",
@@ -531,7 +531,7 @@ dependencies = [
 name = "nes_rom_db"
 version = "0.0.1"
 dependencies = [
- "clap 3.1.5",
+ "clap 3.1.6",
  "csv",
  "rust_nes",
  "serde",
@@ -820,7 +820,7 @@ dependencies = [
 name = "sdl2_frontend"
 version = "0.1.0"
 dependencies = [
- "clap 3.1.5",
+ "clap 3.1.6",
  "crc32fast",
  "log",
  "log4rs",

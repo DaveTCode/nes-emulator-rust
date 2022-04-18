@@ -7,7 +7,7 @@ license = "MIT"
 publish = false
 
 [dependencies]
-clap = "3.1.8"
+clap = "3.1.9"
 csv = "1.1.6"
 rust_nes = { path = "../emulator" }
 serde = { version = "1.0.136", features = ["derive"] }

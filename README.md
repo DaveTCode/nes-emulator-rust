@@ -1,5 +1,4 @@
-![Build Status](https://github.com/davetcode/nes-emulator-rust/actions/workflows/build/badge.svg)
-
+[![Build Status](https://github.com/DaveTCode/nes-emulator-rust/actions/workflows/build.yml/badge.svg)](https://github.com/DaveTCode/nes-emulator-rust/actions/workflows/build.yml)
 
 # Rust Nes Emulator
 

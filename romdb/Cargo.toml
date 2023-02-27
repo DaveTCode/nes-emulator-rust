@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 clap = "4.1.6"
-csv = "1.1.6"
+csv = "1.2.0"
 rust_nes = { path = "../emulator" }
 serde = { version = "1.0.151", features = ["derive"] }
 

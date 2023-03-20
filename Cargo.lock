@@ -68,6 +68,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "bitflags"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "487f1e0fcbe47deb8b0574e646def1c903389d95241dd1bbcc6ce4a715dfc0c1"
+
+[[package]]
 name = "block-buffer"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -185,7 +191,7 @@ version = "3.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "clap_lex 0.2.2",
  "indexmap",
  "textwrap",
@@ -197,7 +203,7 @@ version = "4.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f3061d6db6d8fcbbd4b05e057f2acace52e64e96b498c08c2d7a4e65addd340"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "clap_derive",
  "clap_lex 0.3.0",
  "is-terminal",
@@ -937,7 +943,7 @@ version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62f25bc4c7e55e0b0b7a1d43fb893f4fa1361d0abe38b9ce4f323c2adfe6ef42"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
 ]
 
 [[package]]
@@ -959,7 +965,7 @@ checksum = "49b3de9ec5dc0a3417da371aab17d729997c15010e7fd24ff707773a33bddb64"
 name = "rust_nes"
 version = "0.0.1"
 dependencies = [
- "bitflags",
+ "bitflags 2.0.2",
  "crc32fast",
  "criterion",
  "log",
@@ -973,7 +979,7 @@ version = "0.36.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb93e85278e08bb5788653183213d3a60fc242b10cb9be96586f5a73dcb67c23"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "errno",
  "io-lifetimes",
  "libc",
@@ -1008,7 +1014,7 @@ version = "0.35.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7959277b623f1fb9e04aea73686c3ca52f01b2145f8ea16f4ff30d8b7623b1a"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "lazy_static",
  "libc",
  "sdl2-sys",

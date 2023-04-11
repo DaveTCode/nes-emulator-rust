@@ -10,7 +10,7 @@ publish = false
 clap = "4.1.7"
 csv = "1.2.0"
 rust_nes = { path = "../emulator" }
-serde = { version = "1.0.152", features = ["derive"] }
+serde = { version = "1.0.160", features = ["derive"] }
 
 [[bin]]
 name = "nes-rom-db"
